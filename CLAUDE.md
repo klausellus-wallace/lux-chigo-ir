@@ -1,0 +1,91 @@
+# CLAUDE.md — context for AI coding assistants
+
+This file is read by Claude Code at session start and gives future
+sessions the ground truth for this repo so we don't have to re-derive
+it every time.
+
+## What this repo is
+
+An ESPHome external component + Home Assistant climate integration for
+the OBI/Euromate "LUX SKG 9000-48 QC" split AC. The AC uses a Chigo
+OEM IR protocol that is proprietary and not covered by any existing
+ESPHome climate platform. The protocol was reverse-engineered against
+raw capture logs; it is fully specified in `docs/protocol.md`.
+
+## Ground truth — do not second-guess
+
+- The wire-protocol spec in `docs/protocol.md` was validated against
+  33+ organic Frame-B captures (100 % checksum match, 100 % round-trip
+  encode/decode). Treat it as authoritative. If code disagrees with
+  the doc, the code is wrong.
+- `tests/captures/*.log` are the raw ground truth. If a change looks
+  right in isolation but breaks `make -C tests run`, the change is
+  wrong.
+- The checksum formula is `bit_reverse(sum(bit_reverse(b) for b in
+  payload[0:13]) & 0xff)`. Do NOT propose alternatives unless you can
+  point to a captured frame where it fails.
+- DISPLAY and MUTE do NOT emit IR. Never add entities or code paths
+  for them.
+- TIMER is intentionally out of scope. Don't add it.
+
+## Repo layout
+
+See `docs/development.md` § "Repo layout" for the file map. Two rules
+of thumb:
+- `components/lux_chigo_ir/protocol.{h,cpp}` is pure C++17 with zero
+  ESPHome/Arduino deps. Host-testable via `tests/Makefile`. All
+  encoding/decoding logic lives here.
+- `components/lux_chigo_ir/lux_chigo_ir.{h,cpp}` is the ESPHome wrapper
+  that translates HA climate state to/from `LuxState` and drives
+  `remote_transmitter` + `remote_receiver`.
+
+## Running tests
+
+Every meaningful protocol change must pass:
+
+```bash
+cd tests
+python3 build_fixtures.py   # regenerate ground truth from captures/
+make run                    # compile + run test_protocol
+```
+
+Expected: `rt_ok=N/N ao_ok=M/M failures=0`.
+
+## Coding conventions
+
+- C++17. Namespaces: `lux_chigo_ir` for the pure protocol layer,
+  `esphome::lux_chigo_ir` for the ESPHome-integrated class.
+- Wire order: bytes are transmitted MSB-first. The internal AC
+  interpretation is LSB-first; that's why the checksum works on
+  bit-reversed bytes. See `docs/protocol.md`.
+- No exceptions in the C++ layer (ESPHome compiles with -fno-exceptions
+  on some targets).
+- Prefer explicit `uint8_t` over `int` for byte-level code.
+- Python (climate.py, build_fixtures.py): follow ESPHome codegen
+  conventions — look at `esphome/components/coolix/climate.py` for
+  the reference pattern.
+
+## When adding a new AC feature
+
+Follow `docs/development.md` § "Adding a new AC feature". Short version:
+protocol.md → LuxState → encode/decode → tests → HA-facing wiring →
+CHANGELOG bump.
+
+## What NOT to do without human confirmation
+
+- Change the checksum formula (see "Ground truth").
+- Add HTTP endpoints, MQTT publishing, or non-ESPHome integrations —
+  scope is deliberately narrow.
+- Move `handoff.md` (the RE working notes) into this repo — it lives
+  in `~/projects/lux-ir/` on the maintainer's machine
+  and is intentionally excluded.
+- Rewrite the fixtures — they're ground truth from a physical remote.
+
+## Human maintainer
+
+[@klausellus-wallace](https://github.com/klausellus-wallace)
+
+## AI-usage disclosure
+
+See `AI_DISCLOSURE.md`. This repo was co-authored with Claude Code.
+All commits attribute the AI collaboration via `Co-Authored-By` lines.

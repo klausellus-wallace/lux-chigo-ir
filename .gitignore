@@ -1,0 +1,19 @@
+# Test binaries
+tests/test_protocol
+tests/*.o
+tests/*.dSYM/
+
+# Test fixtures — regenerable from the source log files, but we keep
+# fixtures.json under version control for reproducibility of test runs.
+# Do NOT ignore fixtures.json.
+tests/fixtures.tmp.json
+
+# Editor cruft
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc

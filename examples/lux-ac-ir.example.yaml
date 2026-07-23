@@ -1,0 +1,243 @@
+external_components:
+  - source: github://klausellus-wallace/lux-chigo-ir
+    components: [lux_chigo_ir]
+
+esphome:
+  name: lux-ac-ir
+  # Appends the last 3 bytes of the MAC as `-xxxxxx` to the hostname so
+  # multiple installations in one LAN don't collide (each XIAO IR Mate
+  # gets its own mDNS name). Delete this line if you only ever plan to
+  # run one unit and want a stable predictable hostname.
+  name_add_mac_suffix: true
+  friendly_name: LUX AC IR
+
+esp32:
+  board: seeed_xiao_esp32c3
+  variant: esp32c3
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+# IR Sender – GPIO5 (TX auf XIAO IR Mate)
+remote_transmitter:
+  id: ir_tx
+  pin: GPIO5
+  carrier_duty_percent: 50%
+
+# IR Empfänger – GPIO4 (RX auf XIAO IR Mate)
+remote_receiver:
+  id: ir_rx
+  pin:
+    number: GPIO4
+    inverted: true
+    mode:
+      input: true
+      pullup: true
+  tolerance: 25%
+  dump: raw
+api:
+  encryption:
+    key: "your-encryption-key-here"
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: lux-ac-ir Fallback Hotspot
+    password: "changeme"
+
+captive_portal:
+
+# Optional web UI on http://<device>/ — lets you flip climate mode, target
+# temp, fan/swing/preset, and see current state without HA. The
+# LUX-specific aux entities below are `internal: true` (hidden from HA
+# because HA's climate card already exposes fan/swing/preset natively).
+# `include_internal: true` re-exposes them here in the ESPHome UI so you
+# can control them hands-on from a browser.
+web_server:
+  port: 80
+  version: 3
+  include_internal: true
+
+# I-FEEL room-temperature source. Push-based subscription to a HA sensor
+# entity — no polling. Last value stays cached if HA blinks. Throttled to
+# 5 min because the AC's regulator is slow. See docs/troubleshooting.md
+# § "What does I-FEEL actually do?" for background.
+sensor:
+  # Preferred temperature source: pulled from HA. Feeds current_temperature
+  # (via the aggregator below) and, when I-FEEL is on, is bit-reversed into
+  # wire byte 11. Internal to avoid duplicating the HA source in HA.
+  - platform: homeassistant
+    id: room_temp
+    entity_id: sensor.living_room_temperature   # replace with your HA sensor
+    filters:
+      - throttle: 5min
+    internal: true
+  # RX I-FEEL readout — value the original remote transmitted (docs/protocol.md
+  # § Byte 11). Doubles as the fallback source for current_temperature when
+  # the HA sensor has no value.
+  - platform: template
+    id: remote_ifeel_readout
+    name: "Remote I-FEEL readout"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 0
+    internal: true
+  # Aggregator: room_temp with fallback to remote_ifeel_readout. Whatever
+  # wins becomes climate.current_temperature via the climate's `sensor:`
+  # binding below, and also the source for I-FEEL TX byte 11.
+  - platform: template
+    id: climate_current_temp
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 1
+    update_interval: 5s
+    lambda: |-
+      if (!std::isnan(id(room_temp).state)) return id(room_temp).state;
+      if (!std::isnan(id(remote_ifeel_readout).state)) return id(remote_ifeel_readout).state;
+      return NAN;
+    internal: true
+
+climate:
+  - platform: lux_chigo_ir
+    name: "AC"
+    id: lux_ac
+    receiver_id: ir_rx
+    transmitter_id: ir_tx
+    sensor: climate_current_temp               # HA sensor with RX-mirror fallback
+    ifeel_output: remote_ifeel_readout         # RX mirror target
+
+# Explicit top-level entities for every AC feature. Each entity performs a
+# climate.control call, so state stays consistent with HA and the physical
+# remote. Delete these blocks if you prefer the compact climate widget with
+# fan/swing/preset behind its settings icon.
+
+select:
+  - platform: template
+    id: lux_preset
+    name: "Preset"
+    internal: true
+    options: ["None", "Eco", "Sleep", "Turbo"]
+    initial_option: "None"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          auto call = id(lux_ac).make_call();
+          if (x == "Eco")   call.set_preset(climate::CLIMATE_PRESET_ECO);
+          else if (x == "Sleep") call.set_preset(climate::CLIMATE_PRESET_SLEEP);
+          else if (x == "Turbo") call.set_preset(climate::CLIMATE_PRESET_BOOST);
+          else call.set_preset(climate::CLIMATE_PRESET_NONE);
+          call.perform();
+
+  - platform: template
+    id: lux_fan
+    name: "Fan mode"
+    internal: true
+    options: ["Auto", "Low", "Medium", "High"]
+    initial_option: "Auto"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          auto call = id(lux_ac).make_call();
+          if (x == "Low")         call.set_fan_mode(climate::CLIMATE_FAN_LOW);
+          else if (x == "Medium") call.set_fan_mode(climate::CLIMATE_FAN_MEDIUM);
+          else if (x == "High")   call.set_fan_mode(climate::CLIMATE_FAN_HIGH);
+          else                    call.set_fan_mode(climate::CLIMATE_FAN_AUTO);
+          call.perform();
+
+switch:
+  - platform: template
+    id: lux_health
+    name: "Ionizer"
+    icon: mdi:air-purifier
+    optimistic: true
+    turn_on_action:
+      - lambda: 'id(lux_ac).set_health(true);'
+    turn_off_action:
+      - lambda: 'id(lux_ac).set_health(false);'
+
+  # Swing horizontal and vertical as independent toggles, matching the
+  # physical remote's two buttons.
+  - platform: template
+    id: lux_swing_h
+    name: "Swing horizontal"
+    internal: true
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          auto call = id(lux_ac).make_call();
+          auto cur = id(lux_ac).swing_mode;
+          call.set_swing_mode(
+            (cur == climate::CLIMATE_SWING_VERTICAL || cur == climate::CLIMATE_SWING_BOTH)
+              ? climate::CLIMATE_SWING_BOTH : climate::CLIMATE_SWING_HORIZONTAL);
+          call.perform();
+    turn_off_action:
+      - lambda: |-
+          auto call = id(lux_ac).make_call();
+          auto cur = id(lux_ac).swing_mode;
+          call.set_swing_mode(
+            (cur == climate::CLIMATE_SWING_VERTICAL || cur == climate::CLIMATE_SWING_BOTH)
+              ? climate::CLIMATE_SWING_VERTICAL : climate::CLIMATE_SWING_OFF);
+          call.perform();
+
+  - platform: template
+    id: lux_swing_v
+    name: "Swing vertical"
+    internal: true
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          auto call = id(lux_ac).make_call();
+          auto cur = id(lux_ac).swing_mode;
+          call.set_swing_mode(
+            (cur == climate::CLIMATE_SWING_HORIZONTAL || cur == climate::CLIMATE_SWING_BOTH)
+              ? climate::CLIMATE_SWING_BOTH : climate::CLIMATE_SWING_VERTICAL);
+          call.perform();
+    turn_off_action:
+      - lambda: |-
+          auto call = id(lux_ac).make_call();
+          auto cur = id(lux_ac).swing_mode;
+          call.set_swing_mode(
+            (cur == climate::CLIMATE_SWING_HORIZONTAL || cur == climate::CLIMATE_SWING_BOTH)
+              ? climate::CLIMATE_SWING_HORIZONTAL : climate::CLIMATE_SWING_OFF);
+          call.perform();
+
+# Sync top-level template entities back from the climate whenever the
+# physical remote (or a HA service call) changes AC state. 500 ms
+# polling — fast enough to feel instant, cheap enough at idle.
+# publish_state is a no-op when the value already matches.
+interval:
+  - interval: 500ms
+    then:
+      - lambda: |-
+          auto sw = id(lux_ac).swing_mode;
+          bool want_h = (sw == climate::CLIMATE_SWING_HORIZONTAL || sw == climate::CLIMATE_SWING_BOTH);
+          bool want_v = (sw == climate::CLIMATE_SWING_VERTICAL   || sw == climate::CLIMATE_SWING_BOTH);
+          if (id(lux_swing_h).state != want_h) id(lux_swing_h).publish_state(want_h);
+          if (id(lux_swing_v).state != want_v) id(lux_swing_v).publish_state(want_v);
+
+          std::string want_p = "None";
+          auto preset = id(lux_ac).preset.value_or(climate::CLIMATE_PRESET_NONE);
+          if      (preset == climate::CLIMATE_PRESET_ECO)   want_p = "Eco";
+          else if (preset == climate::CLIMATE_PRESET_SLEEP) want_p = "Sleep";
+          else if (preset == climate::CLIMATE_PRESET_BOOST) want_p = "Turbo";
+          if (id(lux_preset).state != want_p) id(lux_preset).publish_state(want_p);
+
+          std::string want_f = "Auto";
+          auto fan = id(lux_ac).fan_mode.value_or(climate::CLIMATE_FAN_AUTO);
+          if      (fan == climate::CLIMATE_FAN_LOW)    want_f = "Low";
+          else if (fan == climate::CLIMATE_FAN_MEDIUM) want_f = "Medium";
+          else if (fan == climate::CLIMATE_FAN_HIGH)   want_f = "High";
+          if (id(lux_fan).state != want_f) id(lux_fan).publish_state(want_f);
+
+          // HEALTH mirror — reads private member via public getter
+          // added to LuxChigoIRClimate for exactly this purpose.
+          bool want_hlth = id(lux_ac).get_health();
+          if (id(lux_health).state != want_hlth) id(lux_health).publish_state(want_hlth);
