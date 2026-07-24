@@ -228,14 +228,14 @@ interval:
           if      (preset == climate::CLIMATE_PRESET_ECO)   want_p = "Eco";
           else if (preset == climate::CLIMATE_PRESET_SLEEP) want_p = "Sleep";
           else if (preset == climate::CLIMATE_PRESET_BOOST) want_p = "Turbo";
-          if (id(lux_preset).state != want_p) id(lux_preset).publish_state(want_p);
+          if (id(lux_preset).current_option() != want_p) id(lux_preset).publish_state(want_p);
 
           std::string want_f = "Auto";
           auto fan = id(lux_ac).fan_mode.value_or(climate::CLIMATE_FAN_AUTO);
           if      (fan == climate::CLIMATE_FAN_LOW)    want_f = "Low";
           else if (fan == climate::CLIMATE_FAN_MEDIUM) want_f = "Medium";
           else if (fan == climate::CLIMATE_FAN_HIGH)   want_f = "High";
-          if (id(lux_fan).state != want_f) id(lux_fan).publish_state(want_f);
+          if (id(lux_fan).current_option() != want_f) id(lux_fan).publish_state(want_f);
 
           // HEALTH mirror — reads private member via public getter
           // added to LuxChigoIRClimate for exactly this purpose.
