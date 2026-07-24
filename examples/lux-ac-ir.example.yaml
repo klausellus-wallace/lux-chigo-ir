@@ -20,11 +20,13 @@ esp32:
 logger:
   level: DEBUG
 
-# IR Sender – GPIO5 (TX auf XIAO IR Mate)
+# IR sender — 3× IR LED array on the XIAO IR Mate's D1 pin = GPIO3.
+# (Not GPIO5 — that's the touch sensor per the Seeed docs.)
 remote_transmitter:
   id: ir_tx
-  pin: GPIO5
+  pin: GPIO3
   carrier_duty_percent: 50%
+  non_blocking: false
 
 # IR Empfänger – GPIO4 (RX auf XIAO IR Mate)
 remote_receiver:

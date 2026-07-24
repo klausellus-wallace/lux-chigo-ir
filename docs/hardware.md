@@ -17,13 +17,19 @@ may work but are not verified.
 
 ## Verified controller
 
-Seeed Studio **XIAO IR Mate** — ESP32-C3-based module with IR LED
-and IR receiver pre-integrated. Pins:
+Seeed Studio **XIAO IR Mate** — ESP32-C3-based module with a 3× IR
+LED array and IR receiver pre-integrated. Pins (per Seeed docs):
 
-| Function | GPIO | Direction |
-|---|---|---|
-| IR TX (LED) | 5 | output |
-| IR RX (photodiode) | 4 | input, inverted, pullup |
+| Function | XIAO pin | GPIO | Direction |
+|---|---|---|---|
+| IR TX (3× LED emitter array) | D1 | **3** | output |
+| IR RX (photodiode) | D2 | **4** | input, inverted, pullup |
+
+Watch out for the touch sensor on D3 (GPIO5) — earlier revisions of
+this example used GPIO5 for TX and pulsed the touch input instead of
+the IR LEDs. If a rebuild yields no IR emission (front-camera check
+shows no LED activity), verify the transmitter pin is GPIO3, not
+GPIO5.
 
 ## Any ESP32/ESP8266 + IR LED + IR receiver should work
 
