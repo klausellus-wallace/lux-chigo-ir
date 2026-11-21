@@ -14,16 +14,21 @@ lux_chigo_ir_ns = cg.esphome_ns.namespace("lux_chigo_ir")
 LuxChigoIRClimate = lux_chigo_ir_ns.class_("LuxChigoIRClimate", climate_ir.ClimateIR)
 
 CONF_IFEEL_OUTPUT = "ifeel_output"
+CONF_IFEEL = "ifeel"
 
 CONFIG_SCHEMA = climate_ir.climate_ir_with_receiver_schema(LuxChigoIRClimate).extend(
     {
         cv.Optional(CONF_IFEEL_OUTPUT): cv.use_id(sensor.Sensor),
+        # false: `sensor:` only feeds current_temperature; the AC keeps
+        # regulating on its own built-in sensor (no I-FEEL in TX frames).
+        cv.Optional(CONF_IFEEL, default=True): cv.boolean,
     }
 )
 
 
 async def to_code(config):
     var = await climate_ir.new_climate_ir(config)
+    cg.add(var.set_ifeel_enabled(config[CONF_IFEEL]))
     if CONF_IFEEL_OUTPUT in config:
         sens = await cg.get_variable(config[CONF_IFEEL_OUTPUT])
         cg.add(var.set_ifeel_output(sens))

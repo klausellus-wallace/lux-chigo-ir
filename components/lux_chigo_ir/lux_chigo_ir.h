@@ -12,6 +12,11 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
   // Optional sensor to publish I-FEEL room-temp on RX. Not required for TX.
   void set_ifeel_output(sensor::Sensor *sens) { this->ifeel_output_ = sens; }
 
+  // When false, the base-class `sensor:` only drives current_temperature
+  // and is never transmitted as I-FEEL; the AC regulates on its built-in
+  // sensor. YAML: `ifeel: false`. Default true (legacy behavior).
+  void set_ifeel_enabled(bool on) { this->ifeel_enabled_ = on; }
+
   // Enable/disable HEALTH bit in the encoded frame. Called from YAML
   // template switches (see Task 6). Triggers a fresh transmit_state().
   void set_health(bool on);
@@ -45,6 +50,7 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
 
   sensor::Sensor *ifeel_output_{nullptr};
   bool health_{false};
+  bool ifeel_enabled_{true};
   uint32_t ifeel_max_age_ms_{300000};
   uint32_t last_transmit_ms_{0};
 };

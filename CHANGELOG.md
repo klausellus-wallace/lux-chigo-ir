@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- `ifeel:` climate option (default `true`). With `ifeel: false` the
+  `sensor:` only feeds `current_temperature`; TX frames carry no I-FEEL
+  value and the AC regulates on its built-in sensor. Useful because the
+  I-FEEL value is only refreshed when a command is sent, so a stale
+  reading can make the AC over-heat / over-cool for hours.
 - Initial reverse-engineered protocol implementation.
 - `LuxChigoIRClimate::get_health()` public getter — lets YAML template
   entities mirror the HEALTH bit back from received IR frames.

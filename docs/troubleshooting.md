@@ -67,6 +67,18 @@ sensor located at seated head height (the ESP32 board itself, or a
 zigbee sensor imported via `platform: homeassistant`). The AC will
 then chase your setpoint at that height instead of at the ceiling.
 
+**Turning I-FEEL off but keeping the reading:** the value only reaches
+the AC when a frame is sent, so between commands the AC regulates on a
+stale reading (see below). To show the sensor as `current_temperature`
+in HA without transmitting it, set `ifeel: false` on the climate:
+
+```yaml
+climate:
+  - platform: lux_chigo_ir
+    sensor: room_temp
+    ifeel: false   # display only; AC uses its built-in sensor
+```
+
 ## Feeding I-FEEL from a real Home Assistant sensor
 
 The bundled example YAML uses ESPHome's push-based subscription:

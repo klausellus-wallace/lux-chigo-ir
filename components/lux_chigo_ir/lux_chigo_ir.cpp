@@ -85,8 +85,8 @@ LuxState LuxChigoIRClimate::gather_state_() const {
 
   s.health = this->health_;
 
-  // I-FEEL: use base-class sensor_ if configured, valid, and fresh.
-  if (this->sensor_ != nullptr && !std::isnan(this->sensor_->state)) {
+  // I-FEEL: use base-class sensor_ if enabled, configured, valid, and fresh.
+  if (this->ifeel_enabled_ && this->sensor_ != nullptr && !std::isnan(this->sensor_->state)) {
     bool fresh = true;
     if (this->ifeel_max_age_ms_ > 0) {
       // ESPHome Sensor doesn't track last-update timestamp directly. As a

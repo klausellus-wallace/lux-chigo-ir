@@ -20,7 +20,7 @@ platform. See [docs/protocol.md](docs/protocol.md) for the wire spec and
 | `swing_mode` | OFF, HORIZONTAL, VERTICAL, BOTH |
 | `preset` | NONE, ECO, BOOST (=TURBO), SLEEP |
 | HEALTH toggle | separate `switch:` entity (template pattern) |
-| I-FEEL | sensor input from HA is transmitted as room-temp reference; RX value from remote can be mirrored back via optional `ifeel_output:` sensor |
+| I-FEEL | sensor input from HA is transmitted as room-temp reference; RX value from remote can be mirrored back via optional `ifeel_output:` sensor. Set `ifeel: false` to use the sensor for `current_temperature` only |
 
 The DISPLAY and MUTE buttons on the original remote don't transmit any IR
 signal and are not exposed. TIMER is intentionally out of scope.
