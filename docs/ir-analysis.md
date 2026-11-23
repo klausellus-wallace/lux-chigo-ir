@@ -4,6 +4,22 @@ Start here if you are continuing the remote-control analysis on
 `feat/display-mute-tcl112`. The goal is to read the original remote's IR
 commands and classify each button from **labeled** captures.
 
+## Next session: do this in order
+
+1. **Capture through ESPHome.** Do not flash. Ask the maintainer to set the AC
+   to COOL, 24 °C, fan AUTO, display on, every extra off. Start the log (see
+   Workflow) and confirm that it connects and which clock it uses. The
+   maintainer then runs the guided label command in their own terminal,
+   because it needs keyboard input.
+2. **Classify** with `analyze_capture.py` and answer the questions below.
+3. **Update or remove** the experimental DISPLAY/MUTE code based on the result.
+4. **Only then** build the follow-up in "Follow-up: timed I-FEEL and HA
+   controls". The TX timing change is a separate, later decision.
+
+Before any flash, get the real Home Assistant temperature entity. The device
+YAML still has `sensor.living_room_temperature`, which looks like a placeholder.
+The device address is in the `web_server` comment of the device YAML.
+
 ## Current state
 
 - **Order of work: capture and classify first.** Continue experimental
@@ -72,6 +88,42 @@ The report gives each labeled button one status:
   directions, with no contradiction in the same session.
 - Record what the indoor unit visibly did. A wire bit alone does not prove its
   effect.
+
+## Follow-up: timed I-FEEL and HA controls
+
+The maintainer approved this design. Build it test-first after the capture.
+
+**Timed I-FEEL**
+
+- Add a pure, host-testable send decision. Send only if I-FEEL is on, HA says
+  the AC is on, the temperature is valid, and the HA API is connected.
+- Add runtime `set_ifeel(bool)` / `get_ifeel()`. On: room temperature in every
+  command plus timed sends. Off: send exactly one frame without I-FEEL, so the
+  AC returns to its own sensor. The YAML `ifeel:` option stays the start value
+  and must not transmit at boot.
+- Add `set_ifeel_interval_min()` using ESPHome `set_interval`, plus a YAML
+  option `ifeel_interval`. Without the option, timed sending stays off so
+  existing configs do not start beeping. Example and live YAML use 10 minutes.
+- Add an optional `ifeel_sent_output` sensor for the last transmitted value.
+- Replace the `transmit_state()` lambda in `docs/troubleshooting.md`. That
+  method is `protected`, so the example likely does not compile.
+
+**HA entities** (example YAML first, live YAML after the maintainer's OK)
+
+- I-FEEL switch and interval number (5 to 60 min, step 5, default 10), both
+  restored after reboot, plus a last-sent temperature sensor.
+- Keep the Ionizer visible. Remove `internal: true` from preset, fan and both
+  swing entities.
+- Add Display and Mute to the live YAML only after the capture confirms them.
+- Mirror the new states in the 500 ms `interval:` block.
+
+**Known risks to test live**
+
+- Every timed send transmits the full HA state and may beep. If the receiver
+  missed a remote press, the next send overwrites the real AC state and can
+  switch the AC back on.
+- The manual says I-FEEL ends after 2 hours. The fallback when HA is
+  disconnected relies on this and is unverified.
 
 ## Repo rules
 

@@ -7,6 +7,8 @@
 
 > ⚠️ `CLAUDE.md` im Repo enthält Regeln, die durch diese Erkenntnisse **widerlegt** sind („DISPLAY and MUTE do NOT emit IR. Never add entities or code paths for them.“, „TIMER is intentionally out of scope“). Laut `CLAUDE.md` braucht jede Änderung daran eine Bestätigung durch den Menschen. **Hol dir vor dem Ändern das OK des Maintainers.** Der Maintainer hat die Untersuchung selbst angestoßen. Ändere CLAUDE.md erst danach mit.
 
+> **Stand 2026-11-23, zuerst lesen:** Der aktuelle Arbeitsauftrag steht in [`docs/ir-analysis.md`](docs/ir-analysis.md) auf dem Branch `feat/display-mute-tcl112`. Dieses Dokument bleibt die Quelle für Gerätedaten und Protokoll-Hypothesen. Der Maintainer hat die experimentelle Umsetzung von Abschnitt 5.A freigegeben. Die Einstufung von DISPLAY und MUTE als „sicher belegt“ ist überholt: `capture3.log` liefert Gegenindizien, siehe `docs/verification.md`. Erst labeln und capturen, dann weiterbauen.
+
 ---
 
 ## 1. Gerät: tatsächliche Identität

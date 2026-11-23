@@ -32,6 +32,11 @@ against raw capture logs; it is specified in `docs/protocol.md`.
 - TURBO is byte 6 bit `0x02` on this unit, unlike stock TCL112AC.
 - TIMER is intentionally out of scope. Don't add it.
 
+## Current work
+
+On `feat/display-mute-tcl112`, start with `docs/ir-analysis.md`. It holds the
+next steps, open questions and the approved follow-up.
+
 ## Repo layout
 
 See `docs/development.md` § "Repo layout" for the file map. Two rules
