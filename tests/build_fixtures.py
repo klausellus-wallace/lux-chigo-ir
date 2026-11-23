@@ -80,12 +80,11 @@ def keep(frame: bytes) -> bool:
     Skipped categories:
       - b4 != 0x00 → timer frame (out of scope)
       - b5 in {0x27, 0x36} → RE-era event codes we don't emit
-      - b5 has bit 0x02 set → DISPLAY-persistent state; encoder emits bit
-        0x01 for ECO (live-remote match), so 0x02 frames can't roundtrip.
+
+    Frames with b5 bit 0x02 (display off) are kept: the encoder emits them.
     """
     if frame[4] != 0x00: return False
     if frame[5] in (0x27, 0x36): return False
-    if frame[5] & 0x02: return False
     return True
 
 def main() -> int:

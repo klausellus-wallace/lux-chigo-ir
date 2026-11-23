@@ -88,14 +88,86 @@ static void test_checksum_edges() {
   single_bit[0] = 0x01;  // wire bit 0 (LSB in LSB-first) -> reversed value 0x80
   // sum = 0x80, bit_reverse = 0x01
   CHECK(checksum(single_bit) == 0x01);
+}
 
-  // Frame A checksum: our formula must NOT match 0xa7 (Frame A is a fixed
-  // constant, not a computed checksum). This locks in the "don't compute
-  // Frame A" invariant.
-  uint8_t frame_a_payload[PAYLOAD_BYTES];
-  std::memcpy(frame_a_payload, FRAME_A, PAYLOAD_BYTES);
-  uint8_t frame_a_calc = checksum(frame_a_payload);
-  CHECK(frame_a_calc != FRAME_A[13]);   // 0x6b != 0xa7
+// Frame A literals are the two variants observed in tests/captures/capture2.log.
+static const uint8_t CAPTURED_A_MUTE_OFF[FRAME_BYTES] = {
+    0xc4,0xd3,0x64,0x40,0x00,0x02,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0xa7};
+static const uint8_t CAPTURED_A_MUTE_ON[FRAME_BYTES] = {
+    0xc4,0xd3,0x64,0x40,0x00,0x06,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0xa0};
+
+static void test_frame_a_encode() {
+  uint8_t got[FRAME_BYTES] = {0};
+  encode_frame_a(false, got);
+  expect_bytes(got, CAPTURED_A_MUTE_OFF, "Frame A mute off");
+  encode_frame_a(true, got);
+  expect_bytes(got, CAPTURED_A_MUTE_ON, "Frame A mute on");
+}
+
+static void test_frame_a_decode() {
+  bool mute = true;
+  CHECK(decode_frame_a(CAPTURED_A_MUTE_OFF, mute));
+  CHECK(mute == false);
+  CHECK(decode_frame_a(CAPTURED_A_MUTE_ON, mute));
+  CHECK(mute == true);
+}
+
+static void test_frame_a_decode_rejects_invalid() {
+  bool mute = true;
+  // MUTE bit flipped without its checksum: a single-bit RX error.
+  const uint8_t bad_checksum[FRAME_BYTES] = {
+      0xc4,0xd3,0x64,0x40,0x00,0x06,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0xa7};
+  CHECK(!decode_frame_a(bad_checksum, mute));
+  // Corrupted header byte seen once in capture3.log.
+  const uint8_t bad_header[FRAME_BYTES] = {
+      0xc6,0xd3,0x64,0x40,0x00,0x02,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0xa7};
+  CHECK(!decode_frame_a(bad_header, mute));
+  // Checksum is valid, but byte 5 has a bit never observed in Frame A.
+  const uint8_t unknown_b5[FRAME_BYTES] = {
+      0xc4,0xd3,0x64,0x40,0x00,0x03,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0xa6};
+  CHECK(!decode_frame_a(unknown_b5, mute));
+  // A Frame B is not a Frame A.
+  const uint8_t frame_b[FRAME_BYTES] = {
+      0xc4,0xd3,0x64,0x80,0x00,0x24,0xc0,0xe0,0x00,0x00,0x00,0x00,0x01,0xc3};
+  CHECK(!decode_frame_a(frame_b, mute));
+  CHECK(mute == true);   // rejected frames must not touch the output
+}
+
+static void test_display_bit() {
+  // Captured 0x24/0x26 pair. DISPLAY as the meaning of bit 0x02 is unconfirmed.
+  const uint8_t display_on[FRAME_BYTES] = {
+      0xc4,0xd3,0x64,0x80,0x00,0x24,0xc0,0xe0,0x00,0x00,0x00,0x00,0x01,0xc3};
+  const uint8_t display_off[FRAME_BYTES] = {
+      0xc4,0xd3,0x64,0x80,0x00,0x26,0xc0,0xe0,0x00,0x00,0x00,0x00,0x01,0xc0};
+  uint8_t got[FRAME_BYTES];
+
+  LuxState s{};
+  CHECK(decode(display_off, s));
+  CHECK(s.display_on == false);
+  CHECK(s.eco == false);
+  CHECK(encode(s, got));
+  expect_bytes(got, display_off, "display off roundtrip");
+
+  CHECK(decode(display_on, s));
+  CHECK(s.display_on == true);
+  CHECK(encode(s, got));
+  expect_bytes(got, display_on, "display on roundtrip");
+
+  // ECO (0x01) and display-off (0x02) are independent bits.
+  const uint8_t eco_display_off[FRAME_BYTES] = {
+      0xc4,0xd3,0x64,0x80,0x00,0x27,0xc0,0xe0,0x00,0x00,0x00,0x00,0x01,0xc1};
+  CHECK(decode(eco_display_off, s));
+  CHECK(s.eco == true);
+  CHECK(s.display_on == false);
+  CHECK(encode(s, got));
+  expect_bytes(got, eco_display_off, "ECO + display off roundtrip");
+
+  // Power-off frames stay 0x04: the only off value ever captured.
+  LuxState off{};
+  off.power_on = false;
+  off.display_on = false;
+  CHECK(encode(off, got));
+  CHECK(got[5] == 0x04);
 }
 
 static void test_encode_pinned() {
@@ -237,6 +309,10 @@ int main(int argc, char** argv) {
   test_encode_reject_out_of_range();
   test_decode_reject_bad_checksum();
   test_decode_reject_bad_marker();
+  test_frame_a_encode();
+  test_frame_a_decode();
+  test_frame_a_decode_rejects_invalid();
+  test_display_bit();
 
   // fixtures.json is a flat array of {hex, sources}; every fixture must
   // decode → re-encode byte-exactly.

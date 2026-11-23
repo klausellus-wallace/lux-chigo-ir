@@ -1,0 +1,56 @@
+# Guided capture plan. One button per line, pressed in this order.
+# Start state: AC on, COOL, 24 °C, fan AUTO, display on, every extra off.
+# Wait about 5 seconds between presses. Note what the indoor unit does.
+
+# Reference frame
+TEMP_UP
+TEMP_DOWN
+
+# Candidate: Frame B byte 5 bit 0x02
+DISPLAY
+DISPLAY
+DISPLAY
+DISPLAY
+
+# Candidate: Frame A byte 5 bit 0x04
+MUTE
+MUTE
+MUTE
+MUTE
+
+# Does MUTE persist in Frame A across another button?
+MUTE
+TEMP_UP
+TEMP_DOWN
+MUTE
+
+# Expected: Frame B byte 5 bit 0x01
+ECO
+ECO
+ECO
+ECO
+
+# Does the display state survive a MODE change? (Observed: bit 0x02 cleared.)
+DISPLAY
+MODE
+MODE
+MODE
+MODE
+MODE
+DISPLAY
+
+# Do ECO and DISPLAY combine?
+ECO
+DISPLAY
+DISPLAY
+ECO
+
+# Regression check for known features
+TURBO
+TURBO
+IFEEL
+IFEEL
+HEALTH
+HEALTH
+SLEEP
+SLEEP

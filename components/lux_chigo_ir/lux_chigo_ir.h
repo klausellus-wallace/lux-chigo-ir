@@ -26,6 +26,13 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
   // block to reflect physical-remote presses back into HA.
   bool get_health() const { return this->health_; }
 
+  // Display and MUTE follow the HEALTH pattern: setters transmit on change,
+  // getters let YAML template switches mirror physical-remote presses.
+  void set_display(bool on);
+  bool get_display() const { return this->display_; }
+  void set_mute(bool on);
+  bool get_mute() const { return this->mute_; }
+
   // Guards TX I-FEEL against a stuck / never-updated sensor. Currently
   // implemented as a plausible-range check (accepts temp in (-20, 80) °C).
   // The `ms` argument is preserved as a knob for a future true last-update
@@ -50,6 +57,8 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
 
   sensor::Sensor *ifeel_output_{nullptr};
   bool health_{false};
+  bool display_{true};
+  bool mute_{false};
   bool ifeel_enabled_{true};
   uint32_t ifeel_max_age_ms_{300000};
   uint32_t last_transmit_ms_{0};

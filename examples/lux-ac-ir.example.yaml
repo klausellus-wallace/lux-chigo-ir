@@ -165,6 +165,27 @@ switch:
     turn_off_action:
       - lambda: 'id(lux_ac).set_health(false);'
 
+  - platform: template
+    id: lux_display
+    name: "Display"
+    icon: mdi:television-ambient-light
+    optimistic: true
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+      - lambda: 'id(lux_ac).set_display(true);'
+    turn_off_action:
+      - lambda: 'id(lux_ac).set_display(false);'
+
+  - platform: template
+    id: lux_mute
+    name: "Mute"
+    icon: mdi:volume-off
+    optimistic: true
+    turn_on_action:
+      - lambda: 'id(lux_ac).set_mute(true);'
+    turn_off_action:
+      - lambda: 'id(lux_ac).set_mute(false);'
+
   # Swing horizontal and vertical as independent toggles, matching the
   # physical remote's two buttons.
   - platform: template
@@ -243,3 +264,9 @@ interval:
           // added to LuxChigoIRClimate for exactly this purpose.
           bool want_hlth = id(lux_ac).get_health();
           if (id(lux_health).state != want_hlth) id(lux_health).publish_state(want_hlth);
+
+          bool want_display = id(lux_ac).get_display();
+          if (id(lux_display).state != want_display) id(lux_display).publish_state(want_display);
+
+          bool want_mute = id(lux_ac).get_mute();
+          if (id(lux_mute).state != want_mute) id(lux_mute).publish_state(want_mute);

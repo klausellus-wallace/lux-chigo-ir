@@ -24,9 +24,9 @@ Seeed Studio XIAO IR Mate (ESP32-C3) with ESPHome. IR RX on GPIO4
 - **`dump: all` misclassifies noise.** The Bang & Olufsen `beo4`
   decoder repeatedly matched IR-room background noise. Always use
   `dump: raw`.
-- **Every keypress sends two frames.** Frame A (byte 3 = 0x40) is a
-  fixed preamble; Frame B (byte 3 = 0x80) carries the command. Analyse
-  Frame B only.
+- **Every keypress sends two frames.** Frame A (byte 3 = 0x40) carries
+  the MUTE state; Frame B (byte 3 = 0x80) carries the command. Analyse
+  both.
 - **Bit-noise on the RX side flips ~1 bit per few frames.** When two
   captures of the same press differ, compare multiple captures
   (majority vote) before assuming a protocol variant.
@@ -56,11 +56,27 @@ distinct hex codes; they can't be combined because they share the
 byte. This drives our TX priority: sleep > swing-V > TURBO/FAN forces
 HIGH > user fan.
 
-### DISPLAY and MUTE don't emit IR
+### DISPLAY and MUTE: likely IR, not yet proven
 
-10 buttons were pressed in a targeted session (DISPLAY × 3, MUTE × 3).
-Only ~4 IR frames arrived. Concluded: DISPLAY and MUTE are handled
-locally on the remote and never emit an IR command.
+The original notes concluded that these buttons emit no IR because a
+`capture3.log` session produced fewer frames than expected. Those notes also
+say the result was not technically proven. No log names the pressed buttons,
+so every mapping below is inferred from press order.
+
+- **DISPLAY candidate (Frame B byte 5 bit `0x02`):** `capture2.log` changes
+  `0x26 → 0x24` at 20:45:52 and returns at 20:45:55. The return frame has a
+  flipped byte 4 bit and fails its checksum, so that bit is RX noise.
+- **Conflicting evidence:** `capture3.log` toggles the same bit at 20:56:54,
+  20:56:57 and 20:57:00, where the original notes list three ECO presses.
+  Those notes treated `0x02` as ECO, which a later live test corrected to
+  `0x01`, so the label may be wrong. The bit also clears at 20:56:24 on a
+  MODE press, and it changes at 20:55:11 with no other byte changing.
+- **MUTE candidate (Frame A byte 5 bit `0x04`):** `capture2.log` changes
+  `0x02 → 0x06` at 20:45:47 with a valid checksum (`0xa0`), and returns at
+  20:45:50. This is the only MUTE-on frame. `capture3.log` has none, although
+  the original notes describe three targeted MUTE presses in that session.
+
+A timed capture and a hardware test must confirm both functions.
 
 ## Live-test verification (post-Task 10)
 

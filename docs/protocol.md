@@ -1,9 +1,16 @@
-# LUX/Chigo IR Protocol — Wire Specification
+# LUX/Euromate IR Protocol — Wire Specification
+
+The protocol is a device-specific variant of **TCL112AC** as implemented in
+[IRremoteESP8266](https://github.com/crankyoldgit/IRremoteESP8266)
+(`src/ir_Tcl.h`). That library sends LSB-first and this repo reads MSB-first,
+so every wire byte here is `bit_reverse(logical TCL byte)`. This does not
+prove that TCL built the unit. Known differences: TURBO is wire bit `0x02`
+(TCL: `0x04`), and byte 6 bit `0x01` plus byte 11 carry I-FEEL.
 
 ## Overview
 
 Every button press transmits **two frames**:
-- **Frame A** — fixed 14-byte preamble, identical for every press.
+- **Frame A** — 14-byte special frame carrying the MUTE state.
 - **Frame B** — 14-byte command frame carrying mode/temp/fan/aux state.
 
 Gap between A and B: ~200 ms (150–400 ms observed).
@@ -21,15 +28,28 @@ Bytes are transmitted MSB-first over the wire, but the AC internally
 interprets each byte as LSB-first. This matters for the checksum (see
 below).
 
-## Frame A (preamble)
+## Frame A (special frame)
 
 ```
-c4 d3 64 40 00 02 00 00 01 00 00 00 00 a7
+MUTE off: c4 d3 64 40 00 02 00 00 01 00 00 00 00 a7
+MUTE on:  c4 d3 64 40 00 06 00 00 01 00 00 00 00 a0
 ```
 
-Fixed constant. Byte 3 = 0x40 identifies it. Byte 13 = 0xa7 is a fixed
-value, not computed by the same formula as Frame B — treat it as part
-of the constant.
+Byte 3 = 0x40 identifies it. Byte 5 bit `0x04` is MUTE (TCL "Quiet").
+Byte 8 = `0x01` is undefined in TCL and is sent unchanged.
+
+The checksum adds an offset of `0x0f` to the logical sum:
+
+```python
+def frame_a_checksum(payload_13_bytes: bytes) -> int:
+    total = sum(bit_reverse(b) for b in payload_13_bytes) + 0x0f
+    return bit_reverse(total & 0xff)
+```
+
+All 72 clean Frame A captures match this formula. **Unconfirmed:** bit `0x04`
+as MUTE rests on one captured frame (`capture2.log`, 20:45:47), and the log
+does not name the pressed button. `capture3.log` has no such frame. Its effect
+on the AC is not yet hardware-tested. See `docs/verification.md`.
 
 ## Frame B (command)
 
@@ -52,14 +72,21 @@ Byte 3 = 0x80 identifies a command frame (0x40 = preamble).
 - `0x00`: not a timer frame.
 - `0x10`: timer active. **Not implemented in this component.**
 
-### Byte 5 — power + ECO
+### Byte 5 — power + ECO + display
 | Bit | Meaning |
 |---|---|
 | 0x20 | Power ON (0 = OFF) |
-| 0x04 | Constant 1 in every observed frame (reserved / protocol-version bit) |
-| 0x02 | ECO active |
+| 0x10 | Off-timer enabled. **Not implemented in this component.** |
+| 0x04 | Set in every valid Frame B. TCL "Quiet" position; may control the beep (untested) |
+| 0x02 | Display OFF (inverted: 0 = display on) |
+| 0x01 | ECO active |
 
-Common wire values: `0x24` (on, no ECO), `0x26` (on, ECO), `0x04` (off).
+Common wire values: `0x24` (on, display on), `0x26` (on, display off),
+`0x27` (on, display off, ECO), `0x04` (off).
+
+**Unconfirmed:** bit `0x02` as DISPLAY is inferred from press order and the
+TCL112AC layout, as is the polarity (set = off). The bit also clears on a
+captured MODE press. See `docs/verification.md`.
 
 ### Byte 6 — mode + feature flags
 Upper 4 bits = mode:

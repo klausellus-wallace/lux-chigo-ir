@@ -1,14 +1,17 @@
-# lux_chigo_ir — ESPHome external component for LUX/Chigo split AC
+# lux_chigo_ir — ESPHome external component for LUX/Euromate split AC
 
 Home Assistant integration for the OBI-branded LUX split AC ("Split-Klimagerät
-EEK: A++ SKG 9000-48 QC", Art.-Nr. 3432531) via IR, with **bidirectional
-state sync**: HA commands are transmitted to the AC, and manual presses on
-the original remote are received and reflected back to HA.
+EEK: A++ SKG 9000-48 QC", OBI Art.-Nr. 3432531, Euromate Art.-Nr. 482255) via
+IR, with **bidirectional state sync**: HA commands are transmitted to the AC,
+and manual presses on the original remote are received and reflected back to
+HA.
 
-The protocol is a Chigo-OEM variant that is NOT ZH/JT-03 (despite superficial
-button-layout similarity) and NOT covered by any existing ESPHome climate
-platform. See [docs/protocol.md](docs/protocol.md) for the wire spec and
-[docs/verification.md](docs/verification.md) for how it was reverse-engineered.
+The protocol is a **TCL112AC variant**. ESPHome's `tcl112` platform covers only
+the basics, so this component adds the device-specific ECO, TURBO, I-FEEL,
+HEALTH, display and MUTE handling. The component keeps its historical
+`lux_chigo_ir` name. See [docs/protocol.md](docs/protocol.md) for the wire spec
+and [docs/verification.md](docs/verification.md) for how it was
+reverse-engineered.
 
 ## Features
 
@@ -21,9 +24,10 @@ platform. See [docs/protocol.md](docs/protocol.md) for the wire spec and
 | `preset` | NONE, ECO, BOOST (=TURBO), SLEEP |
 | HEALTH toggle | separate `switch:` entity (template pattern) |
 | I-FEEL | sensor input from HA is transmitted as room-temp reference; RX value from remote can be mirrored back via optional `ifeel_output:` sensor. Set `ifeel: false` to use the sensor for `current_temperature` only |
+| Display toggle | separate `switch:` entity (template pattern). Polarity not yet hardware-tested |
+| MUTE toggle | separate `switch:` entity (template pattern). Effect not yet hardware-tested |
 
-The DISPLAY and MUTE buttons on the original remote don't transmit any IR
-signal and are not exposed. TIMER is intentionally out of scope.
+TIMER is intentionally out of scope.
 
 ## Hardware
 
@@ -75,6 +79,21 @@ switch:
       - lambda: 'id(lux_ac).set_health(true);'
     turn_off_action:
       - lambda: 'id(lux_ac).set_health(false);'
+  - platform: template
+    name: "LUX Display"
+    optimistic: true
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+      - lambda: 'id(lux_ac).set_display(true);'
+    turn_off_action:
+      - lambda: 'id(lux_ac).set_display(false);'
+  - platform: template
+    name: "LUX Mute"
+    optimistic: true
+    turn_on_action:
+      - lambda: 'id(lux_ac).set_mute(true);'
+    turn_off_action:
+      - lambda: 'id(lux_ac).set_mute(false);'
 ```
 
 A complete example lives in [`examples/lux-ac-ir.example.yaml`](examples/lux-ac-ir.example.yaml).

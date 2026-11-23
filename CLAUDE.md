@@ -7,10 +7,10 @@ it every time.
 ## What this repo is
 
 An ESPHome external component + Home Assistant climate integration for
-the OBI/Euromate "LUX SKG 9000-48 QC" split AC. The AC uses a Chigo
-OEM IR protocol that is proprietary and not covered by any existing
-ESPHome climate platform. The protocol was reverse-engineered against
-raw capture logs; it is fully specified in `docs/protocol.md`.
+the OBI/Euromate "LUX SKG 9000-48 QC" split AC (Euromate 482255). The
+AC uses a device-specific TCL112AC variant, which ESPHome's `tcl112`
+platform only partly covers. The protocol was reverse-engineered
+against raw capture logs; it is specified in `docs/protocol.md`.
 
 ## Ground truth — do not second-guess
 
@@ -21,11 +21,15 @@ raw capture logs; it is fully specified in `docs/protocol.md`.
 - `tests/captures/*.log` are the raw ground truth. If a change looks
   right in isolation but breaks `make -C tests run`, the change is
   wrong.
-- The checksum formula is `bit_reverse(sum(bit_reverse(b) for b in
-  payload[0:13]) & 0xff)`. Do NOT propose alternatives unless you can
-  point to a captured frame where it fails.
-- DISPLAY and MUTE do NOT emit IR. Never add entities or code paths
-  for them.
+- The Frame B checksum formula is `bit_reverse(sum(bit_reverse(b) for
+  b in payload[0:13]) & 0xff)`. Frame A adds `0x0f` to the sum before
+  the mask. Do NOT propose alternatives unless you can point to a
+  captured frame where they fail.
+- DISPLAY (Frame B byte 5 bit `0x02`) and MUTE (Frame A byte 5 bit
+  `0x04`) are unconfirmed candidates, inferred from press order. Do not
+  treat them as ground truth until a timed capture and hardware test
+  confirm them. See `docs/verification.md`.
+- TURBO is byte 6 bit `0x02` on this unit, unlike stock TCL112AC.
 - TIMER is intentionally out of scope. Don't add it.
 
 ## Repo layout

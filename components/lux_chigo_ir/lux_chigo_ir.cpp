@@ -84,6 +84,7 @@ LuxState LuxChigoIRClimate::gather_state_() const {
   s.sleep = (preset == climate::CLIMATE_PRESET_SLEEP);
 
   s.health = this->health_;
+  s.display_on = this->display_;
 
   // I-FEEL: use base-class sensor_ if enabled, configured, valid, and fresh.
   if (this->ifeel_enabled_ && this->sensor_ != nullptr && !std::isnan(this->sensor_->state)) {
@@ -114,6 +115,18 @@ void LuxChigoIRClimate::set_health(bool on) {
   this->transmit_state();
 }
 
+void LuxChigoIRClimate::set_display(bool on) {
+  if (this->display_ == on) return;
+  this->display_ = on;
+  this->transmit_state();
+}
+
+void LuxChigoIRClimate::set_mute(bool on) {
+  if (this->mute_ == on) return;
+  this->mute_ = on;
+  this->transmit_state();
+}
+
 void LuxChigoIRClimate::send_frames_(const uint8_t frame_b[FRAME_BYTES]) {
   auto call = this->transmitter_->transmit();
   auto *data = call.get_data();
@@ -135,7 +148,9 @@ void LuxChigoIRClimate::send_frames_(const uint8_t frame_b[FRAME_BYTES]) {
     data->mark(BIT_MARK_US);   // trailing mark
   };
 
-  emit_frame(FRAME_A);
+  uint8_t frame_a[FRAME_BYTES];
+  encode_frame_a(this->mute_, frame_a);
+  emit_frame(frame_a);
   data->space(FRAME_GAP_US);
   emit_frame(frame_b);
 
@@ -223,10 +238,17 @@ bool LuxChigoIRClimate::on_receive(remote_base::RemoteReceiveData data) {
     frame[bi] = byte;
   }
 
+  // Frame A carries only MUTE. YAML switches pick it up through get_mute().
+  bool rx_mute = false;
+  if (decode_frame_a(frame, rx_mute)) {
+    this->mute_ = rx_mute;
+    return true;
+  }
+
   LuxState s{};
   if (!decode(frame, s)) {
-    // Includes: Frame A preamble, invalid checksum, unknown byte values,
-    // or timer frames. Silently ignore — logging every RX flood-fills DEBUG.
+    // Includes: invalid checksum, unknown byte values, or timer frames.
+    // Silently ignore — logging every RX flood-fills DEBUG.
     return false;
   }
 
@@ -268,6 +290,9 @@ void LuxChigoIRClimate::publish_from_state_(const LuxState &s) {
   // Mirror HEALTH state internally so the next TX preserves it.
   this->health_ = s.health;
 
+  // Power-off frames never carry the display bit, so they must not reset it.
+  if (s.power_on) this->display_ = s.display_on;
+
   // Publish the I-FEEL sensor value from the remote, if configured.
   if (this->ifeel_output_ != nullptr) {
     if (s.ifeel) {
@@ -283,10 +308,10 @@ void LuxChigoIRClimate::publish_from_state_(const LuxState &s) {
 void LuxChigoIRClimate::log_state_(const LuxState &s, const char *prefix) {
   ESP_LOGD(TAG,
            "%s: power=%d mode=0x%02x temp=%uC fan=0x%02x swing_h=%d swing_v=%d "
-           "sleep=%d eco=%d turbo=%d ifeel=%d ifeel_t=%uC health=%d",
+           "sleep=%d eco=%d turbo=%d ifeel=%d ifeel_t=%uC health=%d display=%d",
            prefix, s.power_on, static_cast<uint8_t>(s.mode), s.temp_c,
            static_cast<uint8_t>(s.fan), s.swing_h, s.swing_v, s.sleep,
-           s.eco, s.turbo, s.ifeel, s.ifeel_temp_c, s.health);
+           s.eco, s.turbo, s.ifeel, s.ifeel_temp_c, s.health, s.display_on);
 }
 
 }  // namespace esphome::lux_chigo_ir
