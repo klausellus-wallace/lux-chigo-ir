@@ -162,21 +162,22 @@ select:
           call.perform();
 
 number:
-  # Minutes between timed I-FEEL sends. on_value (not set_action) also fires
-  # when the value is restored at boot, so the component gets it then too.
+  # Minutes between timed I-FEEL sends (0.5 = 30 s, handy for testing).
+  # on_value (not set_action) also fires when the value is restored at boot,
+  # so the component gets it then too.
   - platform: template
     id: lux_ifeel_interval
     name: "I-FEEL interval"
     icon: mdi:timer-outline
     unit_of_measurement: "min"
-    min_value: 5
+    min_value: 0.5
     max_value: 60
-    step: 5
+    step: 0.5
     initial_value: 10
     optimistic: true
     restore_value: true
     on_value:
-      - lambda: 'id(lux_ac).set_ifeel_interval_min(static_cast<uint32_t>(x));'
+      - lambda: 'id(lux_ac).set_ifeel_interval_s(static_cast<uint32_t>(x * 60.0f + 0.5f));'
 
 switch:
   # I-FEEL on: the AC regulates on the HA room temperature (sent with every

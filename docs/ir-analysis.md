@@ -96,7 +96,7 @@ The maintainer approved this design. Build it test-first after the capture.
 
 **HA entities** (example YAML first, live YAML after the maintainer's OK)
 
-- I-FEEL switch and interval number (5 to 60 min, step 5, default 10), both
+- I-FEEL switch and interval number (0.5 to 60 min, step 0.5, default 10), both
   restored after reboot, plus a last-sent temperature sensor.
 - Keep the Ionizer visible. Remove `internal: true` from preset, fan and both
   swing entities.

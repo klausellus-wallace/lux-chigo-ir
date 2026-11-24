@@ -141,17 +141,17 @@ void LuxChigoIRClimate::set_ifeel(bool on) {
   this->transmit_state();
 }
 
-void LuxChigoIRClimate::set_ifeel_interval_min(uint32_t min) {
-  this->ifeel_interval_min_ = min;
+void LuxChigoIRClimate::set_ifeel_interval_s(uint32_t s) {
+  this->ifeel_interval_s_ = s;
   if (this->ready_) this->apply_ifeel_interval_();
 }
 
 void LuxChigoIRClimate::apply_ifeel_interval_() {
-  if (this->ifeel_interval_min_ == 0) {
+  if (this->ifeel_interval_s_ == 0) {
     this->cancel_interval("lux_ifeel");
     return;
   }
-  this->set_interval("lux_ifeel", this->ifeel_interval_min_ * 60u * 1000u,
+  this->set_interval("lux_ifeel", this->ifeel_interval_s_ * 1000u,
                      [this]() { this->ifeel_tick_(); });
 }
 

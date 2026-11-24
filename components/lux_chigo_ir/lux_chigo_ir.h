@@ -25,11 +25,13 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
   void set_ifeel(bool on);
   bool get_ifeel() const { return this->ifeel_enabled_; }
 
-  // Timed I-FEEL: resend the full state every `min` minutes while
+  // Timed I-FEEL: resend the full state every `s` seconds while
   // ifeel_send_due() holds. 0 (default) disables timed sends. YAML:
   // `ifeel_interval:`; can also be changed at runtime from a number entity.
-  void set_ifeel_interval_min(uint32_t min);
-  uint32_t get_ifeel_interval_min() const { return this->ifeel_interval_min_; }
+  void set_ifeel_interval_s(uint32_t s);
+  void set_ifeel_interval_min(uint32_t min) { this->set_ifeel_interval_s(min * 60u); }
+  uint32_t get_ifeel_interval_s() const { return this->ifeel_interval_s_; }
+  uint32_t get_ifeel_interval_min() const { return this->ifeel_interval_s_ / 60u; }
 
   // Optional sensor: last I-FEEL temperature actually transmitted (NaN when
   // the last frame carried no I-FEEL value).
@@ -78,7 +80,7 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
 
   sensor::Sensor *ifeel_output_{nullptr};
   sensor::Sensor *ifeel_sent_output_{nullptr};
-  uint32_t ifeel_interval_min_{0};
+  uint32_t ifeel_interval_s_{0};
   bool ready_{false};   // set on the first loop, after every setup() ran
   bool health_{false};
   bool beep_{false};
