@@ -17,6 +17,9 @@ constexpr uint32_t CARRIER_HZ          = 38000;
 constexpr int FRAME_BYTES = 14;
 constexpr int PAYLOAD_BYTES = 13;   // bytes 0-12; byte 13 is the checksum
 
+// Frame A: fixed preamble (see docs/protocol.md § Frame A (preamble)). Sent verbatim before every Frame B.
+extern const uint8_t FRAME_A[FRAME_BYTES];
+
 // Semantic enums — see docs/protocol.md § Byte 6 — mode + feature flags through § Byte 12 — swing-H + mode base
 enum class Mode : uint8_t {
   COOL = 0xc0,
@@ -47,7 +50,10 @@ struct LuxState {
   bool  swing_h         = false;
   bool  sleep           = false;
   uint8_t ifeel_temp_c  = 0;       // only used when ifeel=true; 0..127
-  bool  display_on      = true;    // Frame B byte 5 bit 0x02, inverted
+  // Frame B byte 5 bit 0x04. Set in every captured frame (the original remote
+  // always beeps). Cleared = the AC applies the command silently, confirmed
+  // live 2026-11-24. Default true keeps encode/decode roundtrips exact.
+  bool  beep            = true;
 };
 
 // Byte-level utilities
@@ -61,13 +67,6 @@ bool encode(const LuxState& s, uint8_t out[FRAME_BYTES]);
 // Decode 14 wire bytes into LuxState. Validates checksum and byte3==0x80
 // (command frame, not preamble). Returns false on any validation failure.
 bool decode(const uint8_t in[FRAME_BYTES], LuxState& out);
-
-// Build Frame A, which carries the MUTE state in byte 5 bit 0x04.
-void encode_frame_a(bool mute, uint8_t out[FRAME_BYTES]);
-
-// Decode Frame A. Returns false and leaves `mute` untouched on any
-// validation failure.
-bool decode_frame_a(const uint8_t in[FRAME_BYTES], bool& mute);
 
 }  // namespace lux_chigo_ir
 }  // namespace esphome

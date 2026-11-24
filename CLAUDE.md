@@ -25,10 +25,12 @@ against raw capture logs; it is specified in `docs/protocol.md`.
   b in payload[0:13]) & 0xff)`. Frame A adds `0x0f` to the sum before
   the mask. Do NOT propose alternatives unless you can point to a
   captured frame where they fail.
+- Frame B byte 5 bit `0x04` is the beep bit, confirmed live: cleared =
+  the AC applies the command silently. The component clears it by default.
 - DISPLAY (Frame B byte 5 bit `0x02`) and MUTE (Frame A byte 5 bit
-  `0x04`) are unconfirmed candidates, inferred from press order. Do not
-  treat them as ground truth until a timed capture and hardware test
-  confirm them. See `docs/verification.md`.
+  `0x04`) are unknown. The Frame A bit changes AC state but does not mute
+  the beep. Do not implement either without a labeled capture and a
+  hardware test showing the effect. See `docs/verification.md`.
 - TURBO is byte 6 bit `0x02` on this unit, unlike stock TCL112AC.
 - TIMER is intentionally out of scope. Don't add it.
 

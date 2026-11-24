@@ -24,8 +24,8 @@ Seeed Studio XIAO IR Mate (ESP32-C3) with ESPHome. IR RX on GPIO4
 - **`dump: all` misclassifies noise.** The Bang & Olufsen `beo4`
   decoder repeatedly matched IR-room background noise. Always use
   `dump: raw`.
-- **Every keypress sends two frames.** Frame A (byte 3 = 0x40) carries
-  the MUTE state; Frame B (byte 3 = 0x80) carries the command. Analyse
+- **Every keypress sends two frames.** Frame A (byte 3 = 0x40) is a
+  special frame; Frame B (byte 3 = 0x80) carries the command. Analyse
   both.
 - **Bit-noise on the RX side flips ~1 bit per few frames.** When two
   captures of the same press differ, compare multiple captures
@@ -56,12 +56,12 @@ distinct hex codes; they can't be combined because they share the
 byte. This drives our TX priority: sleep > swing-V > TURBO/FAN forces
 HIGH > user fan.
 
-### DISPLAY and MUTE: likely IR, not yet proven
+### DISPLAY and MUTE: unknown, not implemented
 
 The original notes concluded that these buttons emit no IR because a
-`capture3.log` session produced fewer frames than expected. Those notes also
-say the result was not technically proven. No log names the pressed buttons,
-so every mapping below is inferred from press order.
+`capture3.log` session produced fewer frames than expected. No log names the
+pressed buttons, so both mappings below are inferred from press order. The
+component implements neither.
 
 - **DISPLAY candidate (Frame B byte 5 bit `0x02`):** `capture2.log` changes
   `0x26 → 0x24` at 20:45:52 and returns at 20:45:55. The return frame has a
@@ -73,10 +73,53 @@ so every mapping below is inferred from press order.
   MODE press, and it changes at 20:55:11 with no other byte changing.
 - **MUTE candidate (Frame A byte 5 bit `0x04`):** `capture2.log` changes
   `0x02 → 0x06` at 20:45:47 with a valid checksum (`0xa0`), and returns at
-  20:45:50. This is the only MUTE-on frame. `capture3.log` has none, although
+  20:45:50. This is the only such frame. `capture3.log` has none, although
   the original notes describe three targeted MUTE presses in that session.
+  The 2026-11-24 live test (below) shows the AC accepts the bit but it does
+  not silence the beep.
 
-A timed capture and a hardware test must confirm both functions.
+## Live test 2026-11-24: beep bit and Frame A bit
+
+Setup: kitchen unit, ESPHome TX on the experimental branch, HEAT 22 °C, fan
+MEDIUM. The maintainer was off site and listened through a camera. Commands
+went through the ESPHome web API. Power came from the Meross EM06P channel
+that carries the AC; other loads share it, so only large steps count.
+
+**The AC beeps only when a command changes its state.** Resending the current
+state was silent; changing 22 → 23 °C beeped. Every step below therefore
+changes state, and a silent step is followed by a check that it was applied.
+
+**Frame A byte 5 bit `0x04` ("MUTE" candidate):**
+
+| Step | Sent | Beep |
+|---|---|---|
+| 1 | only Frame A bit set, Frame B unchanged | yes |
+| 2 | 22 °C, bit set | yes |
+| 3 | 23 °C, bit set | yes |
+| 4 | only Frame A bit cleared | yes |
+
+The AC accepts the bit and treats it as state, but it does not silence the
+beep. Its effect is unknown. TCL112AC calls it "Quiet"; a change in fan noise
+could not be heard through the camera.
+
+**Frame B byte 5 bit `0x04` (beep):**
+
+| Step | Sent | Beep | Power |
+|---|---|---|---|
+| B1 | bit set, 23 °C | yes | |
+| B2 | bit cleared, 22 °C | no | |
+| B3 | bit set, 22 °C | yes | |
+| D1 | bit cleared, 23 °C | no | |
+| D2 | bit set, 22 °C (value before D1) | yes | |
+| R1 | bit set, fan HIGH | yes | ~386 → 506–573 W |
+| S1 | bit cleared, fan LOW | no | 545–577 → 356–381 W |
+| S2 | bit cleared, fan HIGH | no | ~225–245 → 494–514 W |
+
+D2 beeps only if D1 was applied: had the AC ignored D1, it would still have
+been at 22 °C and D2 would have been silent. S1 and S2 move the power draw
+in both directions without a beep. Conclusion: a cleared bit makes the AC
+apply the command silently. B3 also shows that the bit is part of the state
+the AC compares, so switching back to a set bit beeps once.
 
 ## Live-test verification (post-Task 10)
 

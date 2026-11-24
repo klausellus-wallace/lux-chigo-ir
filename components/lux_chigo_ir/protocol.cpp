@@ -3,9 +3,10 @@
 namespace esphome {
 namespace lux_chigo_ir {
 
-// Frame A adds this offset to the logical (bit-reversed) sum before the
-// final bit reversal. Frame B uses no offset.
-static constexpr uint8_t FRAME_A_CHECKSUM_OFFSET = 0x0f;
+const uint8_t FRAME_A[FRAME_BYTES] = {
+    0xc4, 0xd3, 0x64, 0x40, 0x00, 0x02, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0xa7,
+};
 
 // See docs/protocol.md § Byte 7 — temperature (upper nibble) for full temperature table (temp 16..31 → nibble)
 static constexpr uint8_t TEMP_NIBBLE_TABLE[16] = {
@@ -53,10 +54,12 @@ bool encode(const LuxState& s, uint8_t out[FRAME_BYTES]) {
   // Byte 4: always 0 for non-timer frames
   out[4] = 0x00;
 
-  // Byte 5: power + eco + display-off + fixed bit 0x04. ECO and display-off
-  // are only emitted when the unit is on, because 0x04 is the only power-off
-  // value ever captured.
-  uint8_t b5 = 0x04;
+  // Byte 5: power + eco + beep bit 0x04. ECO is only meaningful when the
+  // unit is on; clamp when off so encode/decode roundtrip stays inside the
+  // {0x04, 0x24, 0x26} value set that decode() accepts. A cleared beep bit
+  // (0x00/0x20/0x21) is TX-only: decode() rejects it, and the original
+  // remote never sends it.
+  uint8_t b5 = s.beep ? 0x04 : 0x00;
   if (s.power_on) {
     b5 |= 0x20;
     // Live-hardware observation (2026-07-23): the physical remote's ECO
@@ -64,7 +67,6 @@ bool encode(const LuxState& s, uint8_t out[FRAME_BYTES]) {
     // session had labeled. Emit 0x01 so HA→AC ECO commands match what
     // the AC expects.
     if (s.eco) b5 |= 0x01;
-    if (!s.display_on) b5 |= 0x02;
   }
   out[5] = b5;
 
@@ -135,7 +137,6 @@ bool decode(const uint8_t in[FRAME_BYTES], LuxState& out) {
   LuxState s{};
   s.power_on = (in[5] & 0x20) != 0;
   s.eco      = (in[5] & 0x01) != 0;   // ECO bit — matches encoder
-  s.display_on = (in[5] & 0x02) == 0;  // inverted: set = display off
 
   // Recover mode from top 4 bits
   uint8_t mode_bits = in[6] & 0xf0;
@@ -186,28 +187,6 @@ bool decode(const uint8_t in[FRAME_BYTES], LuxState& out) {
   // Byte 12 low-nibble is mode-dependent; already implicit via s.mode. No check.
 
   out = s;
-  return true;
-}
-
-static uint8_t frame_a_checksum(const uint8_t payload[PAYLOAD_BYTES]) {
-  uint8_t sum = bit_reverse(checksum(payload));
-  return bit_reverse(static_cast<uint8_t>(sum + FRAME_A_CHECKSUM_OFFSET));
-}
-
-void encode_frame_a(bool mute, uint8_t out[FRAME_BYTES]) {
-  for (int i = 0; i < FRAME_BYTES; i++) out[i] = 0x00;
-  out[0] = 0xc4; out[1] = 0xd3; out[2] = 0x64; out[3] = 0x40;
-  out[5] = mute ? 0x06 : 0x02;
-  out[8] = 0x01;   // Purpose unknown; present in every captured Frame A.
-  out[13] = frame_a_checksum(out);
-}
-
-bool decode_frame_a(const uint8_t in[FRAME_BYTES], bool& mute) {
-  if (in[0] != 0xc4 || in[1] != 0xd3 || in[2] != 0x64) return false;
-  if (in[3] != 0x40) return false;
-  if (frame_a_checksum(in) != in[13]) return false;
-  if (in[5] != 0x02 && in[5] != 0x06) return false;
-  mute = (in[5] & 0x04) != 0;
   return true;
 }
 

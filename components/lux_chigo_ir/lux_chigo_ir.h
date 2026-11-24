@@ -26,12 +26,11 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
   // block to reflect physical-remote presses back into HA.
   bool get_health() const { return this->health_; }
 
-  // Display and MUTE follow the HEALTH pattern: setters transmit on change,
-  // getters let YAML template switches mirror physical-remote presses.
-  void set_display(bool on);
-  bool get_display() const { return this->display_; }
-  void set_mute(bool on);
-  bool get_mute() const { return this->mute_; }
+  // Frame B byte 5 bit 0x04. Off (default) = the AC applies commands from
+  // ESPHome without beeping; confirmed live 2026-11-24 (audio + power draw).
+  // Does not transmit by itself; applies from the next command on.
+  void set_beep(bool on) { this->beep_ = on; }
+  bool get_beep() const { return this->beep_; }
 
   // Guards TX I-FEEL against a stuck / never-updated sensor. Currently
   // implemented as a plausible-range check (accepts temp in (-20, 80) °C).
@@ -57,8 +56,7 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
 
   sensor::Sensor *ifeel_output_{nullptr};
   bool health_{false};
-  bool display_{true};
-  bool mute_{false};
+  bool beep_{false};
   bool ifeel_enabled_{true};
   uint32_t ifeel_max_age_ms_{300000};
   uint32_t last_transmit_ms_{0};

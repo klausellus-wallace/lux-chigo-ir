@@ -91,89 +91,6 @@
     ]
   },
   {
-    "hex": "c4d364800026c0e00000000001c0",
-    "sources": [
-      "capture2.log",
-      "capture2.log",
-      "capture2.log",
-      "capture2.log",
-      "capture2.log",
-      "capture2.log",
-      "capture2.log",
-      "capture2.log",
-      "capture3.log",
-      "capture3.log",
-      "capture3.log",
-      "capture3.log",
-      "capture3.log",
-      "capture3.log",
-      "capture3.log",
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c2f0a0000000010a",
-    "sources": [
-      "capture2.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c1e0000000d80179",
-    "sources": [
-      "capture2.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c8e00000000001c8",
-    "sources": [
-      "capture2.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c0e01c00000001dc",
-    "sources": [
-      "capture3.log",
-      "capture3.log",
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c0e00000000011d0",
-    "sources": [
-      "capture3.log",
-      "capture3.log",
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c0e04000000001a0",
-    "sources": [
-      "capture3.log",
-      "capture3.log",
-      "capture3.log",
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c0e0c00000000160",
-    "sources": [
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c0e0a00000000110",
-    "sources": [
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d364800026c0e0800000000120",
-    "sources": [
-      "capture3.log",
-      "capture3.log"
-    ]
-  },
-  {
     "hex": "c4d36480002440100000000001c3",
     "sources": [
       "capture3.log",
@@ -202,30 +119,6 @@
   {
     "hex": "c4d364800024c0e04000000001a3",
     "sources": [
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d36480002640100000000001c0",
-    "sources": [
-      "capture3.log",
-      "capture3.log",
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d3648000264110000000d80179",
-    "sources": [
-      "capture3.log",
-      "capture3.log",
-      "capture3.log"
-    ]
-  },
-  {
-    "hex": "c4d3648000264910000000d80175",
-    "sources": [
-      "capture3.log",
-      "capture3.log",
       "capture3.log"
     ]
   }

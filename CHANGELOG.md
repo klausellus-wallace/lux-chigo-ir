@@ -6,17 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 ### Changed
 - Device identified as Euromate 482255, protocol as a TCL112AC variant.
-- Frame A is now built dynamically, including its `+0x0f` checksum offset.
-- Fixtures now include display-off frames (byte 5 bit `0x02`).
+- Commands from ESPHome no longer make the AC beep by default. Frame B byte 5
+  bit `0x04` is now the beep bit and is cleared unless `set_beep(true)` is
+  called. Confirmed live by sound and power draw.
 
 ### Fixed
 - Docs: ECO is byte 5 bit `0x01`.
 
 ### Added
-- Experimental display and MUTE support through `set_display()` /
-  `get_display()` and `set_mute()` / `get_mute()`, with template switches in
-  the example YAML. Both bit mappings are inferred and still need a timed
-  capture and hardware test.
+- `set_beep()` / `get_beep()` and a "Beep" template switch in the example
+  YAML (`restore_mode: ALWAYS_OFF`).
+- Docs: Frame A checksum offset (`+0x0f`) and live-test results for the
+  Frame A byte 5 bit `0x04` candidate. It changes AC state but does not mute
+  the beep; its effect is unknown, so DISPLAY and MUTE stay unimplemented.
 - `ifeel:` climate option (default `true`). With `ifeel: false` the
   `sensor:` only feeds `current_temperature`; TX frames carry no I-FEEL
   value and the AC regulates on its built-in sensor. Useful because the

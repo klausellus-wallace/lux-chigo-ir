@@ -10,7 +10,7 @@ prove that TCL built the unit. Known differences: TURBO is wire bit `0x02`
 ## Overview
 
 Every button press transmits **two frames**:
-- **Frame A** — 14-byte special frame carrying the MUTE state.
+- **Frame A** — 14-byte special frame. The component sends it as a constant.
 - **Frame B** — 14-byte command frame carrying mode/temp/fan/aux state.
 
 Gap between A and B: ~200 ms (150–400 ms observed).
@@ -31,12 +31,12 @@ below).
 ## Frame A (special frame)
 
 ```
-MUTE off: c4 d3 64 40 00 02 00 00 01 00 00 00 00 a7
-MUTE on:  c4 d3 64 40 00 06 00 00 01 00 00 00 00 a0
+Sent:      c4 d3 64 40 00 02 00 00 01 00 00 00 00 a7
+Seen once: c4 d3 64 40 00 06 00 00 01 00 00 00 00 a0
 ```
 
-Byte 3 = 0x40 identifies it. Byte 5 bit `0x04` is MUTE (TCL "Quiet").
-Byte 8 = `0x01` is undefined in TCL and is sent unchanged.
+Byte 3 = 0x40 identifies it. The component always sends the first frame
+(`FRAME_A` in `protocol.cpp`). Byte 8 = `0x01` is undefined in TCL.
 
 The checksum adds an offset of `0x0f` to the logical sum:
 
@@ -46,10 +46,13 @@ def frame_a_checksum(payload_13_bytes: bytes) -> int:
     return bit_reverse(total & 0xff)
 ```
 
-All 72 clean Frame A captures match this formula. **Unconfirmed:** bit `0x04`
-as MUTE rests on one captured frame (`capture2.log`, 20:45:47), and the log
-does not name the pressed button. `capture3.log` has no such frame. Its effect
-on the AC is not yet hardware-tested. See `docs/verification.md`.
+All 72 clean Frame A captures match this formula.
+
+**Byte 5 bit `0x04` has an unknown effect.** TCL calls it "Quiet". It is set
+in one capture (`capture2.log`, 20:45:47), possibly a MUTE press. In a live
+test the AC accepted it: toggling only this bit made the AC beep, so it
+changes AC state. It does **not** silence the beep. The intended effect is
+still unknown, so the component does not send it. See `docs/verification.md`.
 
 ## Frame B (command)
 
@@ -62,7 +65,7 @@ byte:  0  1  2  3  4  5  6  7  8  9 10 11 12 13
                      |  |  |  |  └──────────────── aux slot (fan/swing_v/sleep)
                      |  |  |  └─────────────────── temperature nibble
                      |  |  └────────────────────── mode + health/turbo/ifeel flags
-                     |  └───────────────────────── power + ECO + reserved bit
+                     |  └───────────────────────── power + ECO + beep bit
                      └──────────────────────────── timer flag (0x00 non-timer)
 ```
 
@@ -72,21 +75,28 @@ Byte 3 = 0x80 identifies a command frame (0x40 = preamble).
 - `0x00`: not a timer frame.
 - `0x10`: timer active. **Not implemented in this component.**
 
-### Byte 5 — power + ECO + display
+### Byte 5 — power + ECO + beep
 | Bit | Meaning |
 |---|---|
 | 0x20 | Power ON (0 = OFF) |
 | 0x10 | Off-timer enabled. **Not implemented in this component.** |
-| 0x04 | Set in every valid Frame B. TCL "Quiet" position; may control the beep (untested) |
-| 0x02 | Display OFF (inverted: 0 = display on) |
+| 0x04 | Beep. Set = the AC beeps on receipt; cleared = it applies the command silently. Confirmed live 2026-11-24 |
+| 0x02 | Unknown. Set in many remote frames; the component never sends it |
 | 0x01 | ECO active |
 
-Common wire values: `0x24` (on, display on), `0x26` (on, display off),
-`0x27` (on, display off, ECO), `0x04` (off).
+Captured wire values: `0x24` (on), `0x26` (on, bit `0x02`), `0x27`
+(on, bit `0x02`, ECO), `0x04` (off).
 
-**Unconfirmed:** bit `0x02` as DISPLAY is inferred from press order and the
-TCL112AC layout, as is the polarity (set = off). The bit also clears on a
-captured MODE press. See `docs/verification.md`.
+**Beep bit `0x04`.** The original remote always sets it. The component
+clears it by default (`set_beep(false)`), so commands from ESPHome are
+silent. The AC applies such frames: a live test confirmed it by sound and by
+power draw. `decode()` rejects frames without the bit, which is harmless
+because the remote never sends them. See `docs/verification.md`.
+
+**Bit `0x02` is unknown.** TCL112AC uses it for the display light (set =
+off). On this unit it toggles in captures and clears on a MODE press, but
+no labeled capture or hardware test shows what it does. `decode()` ignores
+it and `encode()` never sets it.
 
 ### Byte 6 — mode + feature flags
 Upper 4 bits = mode:

@@ -4,35 +4,20 @@ Start here if you are continuing the remote-control analysis on
 `feat/display-mute-tcl112`. The goal is to read the original remote's IR
 commands and classify each button from **labeled** captures.
 
-## Next session: do this in order
+## Status 2026-11-24
 
-1. **Capture through ESPHome.** Do not flash. Ask the maintainer to set the AC
-   to COOL, 24 °C, fan AUTO, display on, every extra off. Start the log (see
-   Workflow) and confirm that it connects and which clock it uses. The
-   maintainer then runs the guided label command in their own terminal,
-   because it needs keyboard input.
-2. **Classify** with `analyze_capture.py` and answer the questions below.
-3. **Update or remove** the experimental DISPLAY/MUTE code based on the result.
-4. **Only then** build the follow-up in "Follow-up: timed I-FEEL and HA
-   controls". The TX timing change is a separate, later decision.
+- **Beep bit confirmed and implemented.** Frame B byte 5 bit `0x04` cleared =
+  the AC applies the command silently. The component clears it by default
+  (`set_beep()`). Evidence: `docs/verification.md` § "Live test 2026-11-24".
+- **DISPLAY and MUTE removed from the code.** The Frame A bit changes AC state
+  but does not mute the beep, and the display bit could not be checked
+  remotely. Both stay documented as unknown candidates.
+- **Current work: timed I-FEEL** (see "Follow-up" below). Silent commands make
+  periodic sends practical.
+- The TX timing change stays a separate, later decision.
 
-Before any flash, get the real Home Assistant temperature entity. The device
-YAML still has `sensor.living_room_temperature`, which looks like a placeholder.
-The device address is in the `web_server` comment of the device YAML.
-
-## Current state
-
-- **Order of work: capture and classify first.** Continue experimental
-  DISPLAY/MUTE work and the TX timing change only after that.
-- Do not flash this branch for the capture. Capturing only needs the receiver
-  on the firmware already running on the device.
-- The DISPLAY/MUTE draft is committed as experimental. It compiles for
-  ESP32-C3 but has not been tested on the AC. The TX timing is unchanged.
-- The active device config is `~/projects/esphome/lux-ac-ir-7c7754.yaml`. It
-  builds from the local copy in `~/projects/esphome/components/`, not from
-  this branch, and already logs raw IR with `dump: raw`.
-- The three existing logs do not name the pressed buttons. Treat every
-  button-to-bit mapping from them as a hypothesis.
+The capture workflow below still applies to the open questions. Before any
+flash, check the HA temperature entity in the device YAML.
 
 ## Questions to answer
 
@@ -41,13 +26,12 @@ The device address is in the `web_server` comment of the device YAML.
 | 1 | Is Frame B byte 5 bit `0x02` DISPLAY? | Toggles in `capture2.log` at 20:45:52/55 and `capture3.log` at 20:56:54/57 and 20:57:00. The old notes call the latter ECO | Labeled DISPLAY and ECO presses |
 | 2 | Is set = display off? | TCL112AC only | Watching the indoor display |
 | 3 | Why does `0x02` clear on MODE? | `capture3.log` 20:56:24 | DISPLAY, then MODE presses |
-| 4 | Is Frame A byte 5 bit `0x04` MUTE? | One frame, `capture2.log` 20:45:47. None in `capture3.log` | Labeled MUTE presses |
+| 4 | Is Frame A byte 5 bit `0x04` MUTE? | One frame, `capture2.log` 20:45:47. Live 2026-11-24: AC accepts it, it does not mute the beep | Labeled MUTE presses, then an on-site test of what it changes |
 | 5 | Does MUTE persist across other buttons? | Unknown | MUTE, TEMP_UP, TEMP_DOWN, MUTE |
 | 6 | Is ECO byte 5 bit `0x01`? | One `0x27` frame plus a live note in the code | Labeled ECO presses |
-| 7 | Does sending these bits change the AC? | Not tested | HA switches on real hardware |
+| 7 | Does sending these bits change the AC? | Frame A bit: yes, effect unknown. Display bit: not tested | On-site test |
 
-Lower priority, from the maintainer's handoff: the beep bit (byte 5 `0x04`),
-timer resolution, swing-V positions, half-degree, and whether SLEEP is only
+Lower priority, from the maintainer's handoff: timer resolution, swing-V positions, half-degree, and whether SLEEP is only
 fan minimum. TIMER stays out of scope for implementation.
 
 ## Workflow
@@ -114,14 +98,13 @@ The maintainer approved this design. Build it test-first after the capture.
   restored after reboot, plus a last-sent temperature sensor.
 - Keep the Ionizer visible. Remove `internal: true` from preset, fan and both
   swing entities.
-- Add Display and Mute to the live YAML only after the capture confirms them.
 - Mirror the new states in the 500 ms `interval:` block.
 
 **Known risks to test live**
 
-- Every timed send transmits the full HA state and may beep. If the receiver
-  missed a remote press, the next send overwrites the real AC state and can
-  switch the AC back on.
+- Every timed send transmits the full HA state. With the default `beep` off
+  it is silent. If the receiver missed a remote press, the next send
+  overwrites the real AC state and can switch the AC back on.
 - The manual says I-FEEL ends after 2 hours. The fallback when HA is
   disconnected relies on this and is unverified.
 

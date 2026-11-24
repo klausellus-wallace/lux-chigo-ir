@@ -8,7 +8,7 @@ HA.
 
 The protocol is a **TCL112AC variant**. ESPHome's `tcl112` platform covers only
 the basics, so this component adds the device-specific ECO, TURBO, I-FEEL,
-HEALTH, display and MUTE handling. The component keeps its historical
+HEALTH and silent-command (beep) handling. The component keeps its historical
 `lux_chigo_ir` name. See [docs/protocol.md](docs/protocol.md) for the wire spec
 and [docs/verification.md](docs/verification.md) for how it was
 reverse-engineered.
@@ -24,10 +24,11 @@ reverse-engineered.
 | `preset` | NONE, ECO, BOOST (=TURBO), SLEEP |
 | HEALTH toggle | separate `switch:` entity (template pattern) |
 | I-FEEL | sensor input from HA is transmitted as room-temp reference; RX value from remote can be mirrored back via optional `ifeel_output:` sensor. Set `ifeel: false` to use the sensor for `current_temperature` only |
-| Display toggle | separate `switch:` entity (template pattern). Polarity not yet hardware-tested |
-| MUTE toggle | separate `switch:` entity (template pattern). Effect not yet hardware-tested |
+| Beep | commands from ESPHome are silent by default; `set_beep(true)` makes the AC beep like with the original remote. Separate `switch:` entity (template pattern) |
 
-TIMER is intentionally out of scope.
+TIMER is intentionally out of scope. The remote's DISPLAY and MUTE buttons are
+not supported: their wire bits are known candidates, but what they do on this
+unit is unknown (see [docs/verification.md](docs/verification.md)).
 
 ## Hardware
 
@@ -80,20 +81,13 @@ switch:
     turn_off_action:
       - lambda: 'id(lux_ac).set_health(false);'
   - platform: template
-    name: "LUX Display"
+    name: "LUX Beep"
     optimistic: true
-    restore_mode: ALWAYS_ON
+    restore_mode: ALWAYS_OFF   # silent commands by default
     turn_on_action:
-      - lambda: 'id(lux_ac).set_display(true);'
+      - lambda: 'id(lux_ac).set_beep(true);'
     turn_off_action:
-      - lambda: 'id(lux_ac).set_display(false);'
-  - platform: template
-    name: "LUX Mute"
-    optimistic: true
-    turn_on_action:
-      - lambda: 'id(lux_ac).set_mute(true);'
-    turn_off_action:
-      - lambda: 'id(lux_ac).set_mute(false);'
+      - lambda: 'id(lux_ac).set_beep(false);'
 ```
 
 A complete example lives in [`examples/lux-ac-ir.example.yaml`](examples/lux-ac-ir.example.yaml).
