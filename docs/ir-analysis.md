@@ -1,7 +1,6 @@
 # IR analysis handoff
 
-Start here if you are continuing the remote-control analysis on
-`feat/display-mute-tcl112`. The goal is to read the original remote's IR
+Start here if you are continuing the remote-control analysis. The goal is to read the original remote's IR
 commands and classify each button from **labeled** captures.
 
 ## Status 2026-11-24

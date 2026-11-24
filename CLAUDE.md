@@ -36,8 +36,8 @@ against raw capture logs; it is specified in `docs/protocol.md`.
 
 ## Current work
 
-On `feat/display-mute-tcl112`, start with `docs/ir-analysis.md`. It holds the
-next steps, open questions and the approved follow-up.
+Start with `docs/ir-analysis.md`. It holds the current status, the open
+questions and the capture workflow.
 
 ## Repo layout
 
