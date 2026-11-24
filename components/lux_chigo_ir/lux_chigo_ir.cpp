@@ -1,6 +1,10 @@
 #include "lux_chigo_ir.h"
 #include "esphome/core/hal.h"    // for millis()
 #include "esphome/core/log.h"
+#include "esphome/core/defines.h"
+#ifdef USE_API
+#include "esphome/components/api/api_server.h"
+#endif
 #include <cmath>
 
 namespace esphome::lux_chigo_ir {
@@ -95,8 +99,7 @@ LuxState LuxChigoIRClimate::gather_state_() const {
       // plausible range (-20..80°C) — a stuck-at-NaN or wild value is dropped.
       // TODO(docs/verification.md § Live-test verification (post-Task 10) follow-up): if firmware needs real staleness, wire
       // up a timer that resets on sensor state change.
-      float t = this->sensor_->state;
-      fresh = (t > -20.0f && t < 80.0f);
+      fresh = ifeel_temp_valid(this->sensor_->state);
     }
     if (fresh) {
       s.ifeel = true;
@@ -107,6 +110,59 @@ LuxState LuxChigoIRClimate::gather_state_() const {
     }
   }
   return s;
+}
+
+void LuxChigoIRClimate::setup() {
+  climate_ir::ClimateIR::setup();
+  // Timeout 0 runs on the first loop, after every component's setup(). Until
+  // then, restored switches/numbers only store their value.
+  this->set_timeout("lux_ready", 0, [this]() {
+    this->ready_ = true;
+    this->apply_ifeel_interval_();
+  });
+}
+
+bool LuxChigoIRClimate::api_connected_() const {
+#ifdef USE_API
+  return api::global_api_server != nullptr && api::global_api_server->is_connected();
+#else
+  return false;
+#endif
+}
+
+void LuxChigoIRClimate::set_ifeel(bool on) {
+  if (this->ifeel_enabled_ == on) return;
+  this->ifeel_enabled_ = on;
+  if (!this->ready_ || this->mode == climate::CLIMATE_MODE_OFF) return;
+  if (on) {
+    float t = this->sensor_ != nullptr ? this->sensor_->state : NAN;
+    if (!ifeel_temp_valid(t)) return;   // the next command or tick carries it
+  }
+  this->transmit_state();
+}
+
+void LuxChigoIRClimate::set_ifeel_interval_min(uint32_t min) {
+  this->ifeel_interval_min_ = min;
+  if (this->ready_) this->apply_ifeel_interval_();
+}
+
+void LuxChigoIRClimate::apply_ifeel_interval_() {
+  if (this->ifeel_interval_min_ == 0) {
+    this->cancel_interval("lux_ifeel");
+    return;
+  }
+  this->set_interval("lux_ifeel", this->ifeel_interval_min_ * 60u * 1000u,
+                     [this]() { this->ifeel_tick_(); });
+}
+
+void LuxChigoIRClimate::ifeel_tick_() {
+  float t = this->sensor_ != nullptr ? this->sensor_->state : NAN;
+  if (!ifeel_send_due(this->ifeel_enabled_, this->mode != climate::CLIMATE_MODE_OFF, t,
+                      this->api_connected_())) {
+    return;
+  }
+  ESP_LOGD(TAG, "Timed I-FEEL send (%.1f C)", t);
+  this->transmit_state();
 }
 
 void LuxChigoIRClimate::set_health(bool on) {
@@ -187,6 +243,10 @@ void LuxChigoIRClimate::transmit_state() {
            frame_b[0], frame_b[1], frame_b[2], frame_b[3], frame_b[4], frame_b[5], frame_b[6],
            frame_b[7], frame_b[8], frame_b[9], frame_b[10], frame_b[11], frame_b[12], frame_b[13]);
   this->send_frames_(frame_b);
+
+  if (this->ifeel_sent_output_ != nullptr) {
+    this->ifeel_sent_output_->publish_state(s.ifeel ? static_cast<float>(s.ifeel_temp_c) : NAN);
+  }
 }
 
 bool LuxChigoIRClimate::on_receive(remote_base::RemoteReceiveData data) {

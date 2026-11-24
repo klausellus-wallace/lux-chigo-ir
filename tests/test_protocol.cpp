@@ -4,6 +4,7 @@
 //   "accept_only" — decode must return true and not crash, no reproduction
 //
 // Plus explicit unit tests for edge cases and encode-only pinned frames.
+#include <cmath>
 #include "../components/lux_chigo_ir/protocol.h"
 #include <cassert>
 #include <cstdio>
@@ -254,6 +255,25 @@ static void test_beep_bit() {
   CHECK(got[5] == 0x00);
 }
 
+static void test_ifeel_temp_valid() {
+  CHECK(ifeel_temp_valid(21.5f));
+  CHECK(ifeel_temp_valid(-19.9f));
+  CHECK(ifeel_temp_valid(79.9f));
+  CHECK(!ifeel_temp_valid(-20.0f));
+  CHECK(!ifeel_temp_valid(80.0f));
+  CHECK(!ifeel_temp_valid(NAN));
+}
+
+static void test_ifeel_send_due() {
+  // Timed I-FEEL sends only when every condition holds.
+  CHECK(ifeel_send_due(true, true, 21.0f, true));
+  CHECK(!ifeel_send_due(false, true, 21.0f, true));   // I-FEEL off
+  CHECK(!ifeel_send_due(true, false, 21.0f, true));   // AC off in HA
+  CHECK(!ifeel_send_due(true, true, NAN, true));      // no temperature
+  CHECK(!ifeel_send_due(true, true, 95.0f, true));    // implausible value
+  CHECK(!ifeel_send_due(true, true, 21.0f, false));   // HA API disconnected
+}
+
 int main(int argc, char** argv) {
   std::string fx = "tests/fixtures.json";
   if (argc > 1) fx = argv[1];
@@ -265,6 +285,8 @@ int main(int argc, char** argv) {
   test_decode_reject_bad_checksum();
   test_decode_reject_bad_marker();
   test_beep_bit();
+  test_ifeel_temp_valid();
+  test_ifeel_send_due();
 
   // fixtures.json is a flat array of {hex, sources}; every fixture must
   // decode → re-encode byte-exactly.

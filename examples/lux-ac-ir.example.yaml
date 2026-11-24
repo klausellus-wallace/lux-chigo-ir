@@ -56,11 +56,8 @@ wifi:
 captive_portal:
 
 # Optional web UI on http://<device>/ — lets you flip climate mode, target
-# temp, fan/swing/preset, and see current state without HA. The
-# LUX-specific aux entities below are `internal: true` (hidden from HA
-# because HA's climate card already exposes fan/swing/preset natively).
-# `include_internal: true` re-exposes them here in the ESPHome UI so you
-# can control them hands-on from a browser.
+# temp, fan/swing/preset, and see current state without HA.
+# `include_internal: true` also shows the internal helper sensors.
 web_server:
   port: 80
   version: 3
@@ -104,6 +101,13 @@ sensor:
       if (!std::isnan(id(remote_ifeel_readout).state)) return id(remote_ifeel_readout).state;
       return NAN;
     internal: true
+  # Last I-FEEL temperature actually sent to the AC (NaN = none sent).
+  - platform: template
+    id: ifeel_sent
+    name: "I-FEEL last sent"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 0
 
 climate:
   - platform: lux_chigo_ir
@@ -113,6 +117,11 @@ climate:
     transmitter_id: ir_tx
     sensor: climate_current_temp               # HA sensor with RX-mirror fallback
     ifeel_output: remote_ifeel_readout         # RX mirror target
+    # Timed I-FEEL: resend the state with the room temperature every 10 min
+    # while the AC is on and HA is connected. The "I-FEEL interval" number
+    # below overrides it at runtime. Silent, because beep is off by default.
+    ifeel_interval: 10min
+    ifeel_sent_output: ifeel_sent              # last transmitted I-FEEL value
 
 # Explicit top-level entities for every AC feature. Each entity performs a
 # climate.control call, so state stays consistent with HA and the physical
@@ -123,7 +132,6 @@ select:
   - platform: template
     id: lux_preset
     name: "Preset"
-    internal: true
     options: ["None", "Eco", "Sleep", "Turbo"]
     initial_option: "None"
     optimistic: true
@@ -140,7 +148,6 @@ select:
   - platform: template
     id: lux_fan
     name: "Fan mode"
-    internal: true
     options: ["Auto", "Low", "Medium", "High"]
     initial_option: "Auto"
     optimistic: true
@@ -154,7 +161,39 @@ select:
           else                    call.set_fan_mode(climate::CLIMATE_FAN_AUTO);
           call.perform();
 
+number:
+  # Minutes between timed I-FEEL sends. on_value (not set_action) also fires
+  # when the value is restored at boot, so the component gets it then too.
+  - platform: template
+    id: lux_ifeel_interval
+    name: "I-FEEL interval"
+    icon: mdi:timer-outline
+    unit_of_measurement: "min"
+    min_value: 5
+    max_value: 60
+    step: 5
+    initial_value: 10
+    optimistic: true
+    restore_value: true
+    on_value:
+      - lambda: 'id(lux_ac).set_ifeel_interval_min(static_cast<uint32_t>(x));'
+
 switch:
+  # I-FEEL on: the AC regulates on the HA room temperature (sent with every
+  # command and on the interval above). Off: one frame without I-FEEL is
+  # sent and the AC uses its own sensor again. Restored after reboot without
+  # transmitting.
+  - platform: template
+    id: lux_ifeel
+    name: "I-FEEL"
+    icon: mdi:home-thermometer
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - lambda: 'id(lux_ac).set_ifeel(true);'
+    turn_off_action:
+      - lambda: 'id(lux_ac).set_ifeel(false);'
+
   - platform: template
     id: lux_health
     name: "Ionizer"
@@ -184,7 +223,6 @@ switch:
   - platform: template
     id: lux_swing_h
     name: "Swing horizontal"
-    internal: true
     optimistic: true
     turn_on_action:
       - lambda: |-
@@ -206,7 +244,6 @@ switch:
   - platform: template
     id: lux_swing_v
     name: "Swing vertical"
-    internal: true
     optimistic: true
     turn_on_action:
       - lambda: |-
@@ -257,3 +294,6 @@ interval:
           // added to LuxChigoIRClimate for exactly this purpose.
           bool want_hlth = id(lux_ac).get_health();
           if (id(lux_health).state != want_hlth) id(lux_health).publish_state(want_hlth);
+
+          bool want_ifeel = id(lux_ac).get_ifeel();
+          if (id(lux_ifeel).state != want_ifeel) id(lux_ifeel).publish_state(want_ifeel);

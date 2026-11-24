@@ -68,5 +68,13 @@ bool encode(const LuxState& s, uint8_t out[FRAME_BYTES]);
 // (command frame, not preamble). Returns false on any validation failure.
 bool decode(const uint8_t in[FRAME_BYTES], LuxState& out);
 
+// I-FEEL room temperature is plausible: not NaN and within (-20, 80) °C.
+bool ifeel_temp_valid(float temp_c);
+
+// Timed I-FEEL send decision. True only if I-FEEL is on, HA has the AC on,
+// the room temperature is valid and the HA API is connected. Without HA the
+// AC falls back to its own sensor once I-FEEL expires (manual: after 2 h).
+bool ifeel_send_due(bool ifeel_on, bool ac_on, float temp_c, bool api_connected);
+
 }  // namespace lux_chigo_ir
 }  // namespace esphome

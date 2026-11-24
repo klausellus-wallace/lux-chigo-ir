@@ -17,6 +17,24 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
   // sensor. YAML: `ifeel: false`. Default true (legacy behavior).
   void set_ifeel_enabled(bool on) { this->ifeel_enabled_ = on; }
 
+  // Runtime I-FEEL switch (YAML template switch). On: the room temperature
+  // goes into every command and into the timed sends, and is sent right
+  // away. Off: one frame without I-FEEL is sent so the AC returns to its own
+  // sensor. Never transmits before setup is complete, so restoring a switch
+  // at boot stays silent on the wire.
+  void set_ifeel(bool on);
+  bool get_ifeel() const { return this->ifeel_enabled_; }
+
+  // Timed I-FEEL: resend the full state every `min` minutes while
+  // ifeel_send_due() holds. 0 (default) disables timed sends. YAML:
+  // `ifeel_interval:`; can also be changed at runtime from a number entity.
+  void set_ifeel_interval_min(uint32_t min);
+  uint32_t get_ifeel_interval_min() const { return this->ifeel_interval_min_; }
+
+  // Optional sensor: last I-FEEL temperature actually transmitted (NaN when
+  // the last frame carried no I-FEEL value).
+  void set_ifeel_sent_output(sensor::Sensor *sens) { this->ifeel_sent_output_ = sens; }
+
   // Enable/disable HEALTH bit in the encoded frame. Called from YAML
   // template switches (see Task 6). Triggers a fresh transmit_state().
   void set_health(bool on);
@@ -44,6 +62,7 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
 
  protected:
   // ClimateIR virtual overrides
+  void setup() override;
   void control(const climate::ClimateCall &call) override;
   void transmit_state() override;
   bool on_receive(remote_base::RemoteReceiveData data) override;
@@ -53,8 +72,14 @@ class LuxChigoIRClimate : public climate_ir::ClimateIR {
   void publish_from_state_(const LuxState &s);
   void send_frames_(const uint8_t frame_b[FRAME_BYTES]);
   void log_state_(const LuxState &s, const char *prefix);
+  void apply_ifeel_interval_();
+  void ifeel_tick_();
+  bool api_connected_() const;
 
   sensor::Sensor *ifeel_output_{nullptr};
+  sensor::Sensor *ifeel_sent_output_{nullptr};
+  uint32_t ifeel_interval_min_{0};
+  bool ready_{false};   // set on the first loop, after every setup() ran
   bool health_{false};
   bool beep_{false};
   bool ifeel_enabled_{true};

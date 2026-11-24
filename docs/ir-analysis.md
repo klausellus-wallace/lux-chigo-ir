@@ -12,8 +12,10 @@ commands and classify each button from **labeled** captures.
 - **DISPLAY and MUTE removed from the code.** The Frame A bit changes AC state
   but does not mute the beep, and the display bit could not be checked
   remotely. Both stay documented as unknown candidates.
-- **Current work: timed I-FEEL** (see "Follow-up" below). Silent commands make
-  periodic sends practical.
+- **Timed I-FEEL implemented** as designed in "Follow-up" below, including the
+  HA entities in the example YAML. Not yet tested on hardware: check that the
+  timed sends arrive, stay silent, and that turning I-FEEL off returns the AC
+  to its own sensor.
 - The TX timing change stays a separate, later decision.
 
 The capture workflow below still applies to the open questions. Before any

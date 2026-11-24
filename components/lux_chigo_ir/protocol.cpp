@@ -1,4 +1,5 @@
 #include "protocol.h"
+#include <cmath>
 
 namespace esphome {
 namespace lux_chigo_ir {
@@ -188,6 +189,14 @@ bool decode(const uint8_t in[FRAME_BYTES], LuxState& out) {
 
   out = s;
   return true;
+}
+
+bool ifeel_temp_valid(float temp_c) {
+  return !std::isnan(temp_c) && temp_c > -20.0f && temp_c < 80.0f;
+}
+
+bool ifeel_send_due(bool ifeel_on, bool ac_on, float temp_c, bool api_connected) {
+  return ifeel_on && ac_on && api_connected && ifeel_temp_valid(temp_c);
 }
 
 }  // namespace lux_chigo_ir

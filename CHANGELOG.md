@@ -11,9 +11,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   called. Confirmed live by sound and power draw.
 
 ### Fixed
+- Docs: the periodic-resend example in `troubleshooting.md` called the
+  protected `transmit_state()` and could not compile; it now uses
+  `ifeel_interval:`.
 - Docs: ECO is byte 5 bit `0x01`.
 
 ### Added
+- Timed I-FEEL: `ifeel_interval:` option and `set_ifeel_interval_min()`
+  resend the state with the room temperature while I-FEEL is on, the AC is
+  on, the temperature is valid and the HA API is connected
+  (`ifeel_send_due()`, host-tested). No timed sends without the option.
+- Runtime `set_ifeel()` / `get_ifeel()`. Turning I-FEEL off sends one frame
+  without I-FEEL; restoring the switch at boot never transmits.
+- Optional `ifeel_sent_output:` sensor with the last transmitted I-FEEL value.
+- Example YAML: "I-FEEL" switch, "I-FEEL interval" number (5–60 min) and
+  "I-FEEL last sent" sensor. Preset, fan and swing entities are no longer
+  internal.
 - `set_beep()` / `get_beep()` and a "Beep" template switch in the example
   YAML (`restore_mode: ALWAYS_OFF`).
 - Docs: Frame A checksum offset (`+0x0f`) and live-test results for the

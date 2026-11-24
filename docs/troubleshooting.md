@@ -98,23 +98,31 @@ or drops off the network; the AC keeps regulating on that last
 reading until HA comes back. The `throttle: 5min` filter matches the
 original remote's I-FEEL update cadence and keeps IR chatter down.
 
-The value only reaches the AC on the next `transmit_state()` — i.e.
-when HA or the physical remote changes something. If you want the
-ESP to periodically resend the current state so the AC sees fresh
-I-FEEL readings even during idle periods, add:
+The value only reaches the AC with the next command. To keep the AC on
+a fresh reading during idle periods, enable timed I-FEEL:
 
 ```yaml
-interval:
-  - interval: 5min
-    then:
-      - lambda: |-
-          if (id(lux_ac).mode != climate::CLIMATE_MODE_OFF) {
-            id(lux_ac).transmit_state();
-          }
+climate:
+  - platform: lux_chigo_ir
+    sensor: room_temp
+    ifeel_interval: 10min        # resend the state every 10 min
+    ifeel_sent_output: ifeel_sent  # optional: last value sent
 ```
 
-Warning: each transmit makes the AC beep. Extend to `10min` or
-`15min` if the beep is intrusive.
+A timed send happens only while I-FEEL is on, HA has the AC on, the
+temperature is valid and the HA API is connected. Without HA the AC
+falls back to its own sensor once I-FEEL expires (the manual says after
+2 hours; not verified). The sends are silent because the beep bit is
+off by default.
+
+At runtime, `set_ifeel(bool)` switches I-FEEL on or off (off sends one
+frame without I-FEEL), and `set_ifeel_interval_min()` changes the
+interval (0 = off). The example YAML wires both to an "I-FEEL" switch
+and an "I-FEEL interval" number.
+
+Caveat: each timed send transmits the full HA state. If the receiver
+missed a press on the original remote, the send overwrites it, and can
+switch the AC back on.
 
 ## Manual dial as an alternative
 

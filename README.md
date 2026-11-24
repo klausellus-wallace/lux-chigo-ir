@@ -23,7 +23,8 @@ reverse-engineered.
 | `swing_mode` | OFF, HORIZONTAL, VERTICAL, BOTH |
 | `preset` | NONE, ECO, BOOST (=TURBO), SLEEP |
 | HEALTH toggle | separate `switch:` entity (template pattern) |
-| I-FEEL | sensor input from HA is transmitted as room-temp reference; RX value from remote can be mirrored back via optional `ifeel_output:` sensor. Set `ifeel: false` to use the sensor for `current_temperature` only |
+| I-FEEL | sensor input from HA is transmitted as room-temp reference; RX value from remote can be mirrored back via optional `ifeel_output:` sensor. Set `ifeel: false` to use the sensor for `current_temperature` only. Runtime switch via `set_ifeel()` |
+| Timed I-FEEL | `ifeel_interval:` resends the state with the room temperature while the AC is on and HA is connected; runtime interval via `set_ifeel_interval_min()`, last value via `ifeel_sent_output:` |
 | Beep | commands from ESPHome are silent by default; `set_beep(true)` makes the AC beep like with the original remote. Separate `switch:` entity (template pattern) |
 
 TIMER is intentionally out of scope. The remote's DISPLAY and MUTE buttons are
